@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     port: 5173,
@@ -12,4 +12,11 @@ export default defineConfig({
       },
     },
   },
-})
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(
+      mode === 'production'
+        ? 'https://jumpship.onrender.com'
+        : 'http://localhost:8000'
+    ),
+  },
+}))
