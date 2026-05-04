@@ -61,12 +61,23 @@ async def parse_resume_endpoint(
     # Build provider-agnostic LLM client
     from backend.config import settings as cfg
     provider = llm_provider or cfg.llm_provider
+
     # Only fall back to cfg.ollama_base_url for ollama; other providers have their own defaults
     effective_base_url = llm_base_url or (cfg.ollama_base_url if provider == "ollama" else None)
+
+    # Fallback para chaves configuradas no servidor
+    server_key_map = {
+        "openai":    getattr(cfg, "openai_api_key", ""),
+        "anthropic": getattr(cfg, "anthropic_api_key", ""),
+        "groq":      getattr(cfg, "groq_api_key", ""),
+        "gemini":    getattr(cfg, "google_api_key", ""),
+    }
+    effective_api_key = llm_api_key or server_key_map.get(provider, "")
+
     llm = LLMClient(
         provider=provider,
         model=llm_model or cfg.llm_model,
-        api_key=llm_api_key or "",
+        api_key=effective_api_key,
         base_url=effective_base_url or None,
     )
 
