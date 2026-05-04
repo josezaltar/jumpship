@@ -344,7 +344,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     } finally {
       setAssessingIds(new Set());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getLlmFields]);
 
   const jobIds = jobs.map(j => j.id).join(',');
