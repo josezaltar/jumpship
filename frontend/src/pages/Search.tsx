@@ -33,6 +33,7 @@ const JUMPSHIP_SITE_LABELS: Record<string, string> = {
   playwright: 'Career Pages',
 };
 const PAGE_SIZE = 20;
+const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'openclaw']);
 
 function parseSalary(s: string): number {
   if (!s) return -1;
@@ -171,6 +172,10 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     return () => clearInterval(id);
   }, [settings.llmProvider]);
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getBaseUrl = (provider: string, ollamaUrl: string) =>
+    LOCAL_PROVIDERS.has(provider) ? (ollamaUrl || undefined) : undefined;
+
   const handleResumeUpload = useCallback(async (file: File) => {
     setResumeError(null);
     const s = settingsRef.current;
@@ -185,7 +190,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         file,
         llmProvider: s.llmProvider,
         llmModel:    s.llmModel    || undefined,
-        llmBaseUrl:  s.ollamaUrl   || undefined,
+        llmBaseUrl:  getBaseUrl(s.llmProvider, s.ollamaUrl),
         llmApiKey:   apiKey        || undefined,
       });
     } catch (err) {
@@ -251,8 +256,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     clearResume();
   };
 
-  const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'openclaw']);
-
   const getLlmFields = useCallback((featureModel?: string) => {
     const s = settingsRef.current;
     const keyMap: Record<string, string> = {
@@ -264,7 +267,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       llm_provider: s.llmProvider,
       llm_model:    featureModel || s.llmModel || undefined,
       llm_api_key:  keyMap[s.llmProvider] || undefined,
-      llm_base_url: s.ollamaUrl || undefined,
+      llm_base_url: getBaseUrl(s.llmProvider, s.ollamaUrl),
     };
   }, []);
 
@@ -388,7 +391,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       llm_provider: s.llmProvider,
       llm_model:    s.llmModel || undefined,
       llm_api_key:  apiKey     || undefined,
-      llm_base_url: s.ollamaUrl || undefined,
+      llm_base_url: getBaseUrl(s.llmProvider, s.ollamaUrl),
     });
     const entry: SearchHistoryEntry = { keywords: [...keywords], location, sites: [...activeSites], timestamp: Date.now() };
     saveHistory(entry);
@@ -491,7 +494,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       settings.llmProvider === 'openai'    ? settings.openaiKey :
       settings.llmProvider === 'anthropic' ? settings.anthropicKey :
       settings.llmProvider === 'groq'      ? settings.groqKey : '',
-    baseUrl: settings.ollamaUrl,
+    baseUrl: LOCAL_PROVIDERS.has(settings.llmProvider) ? settings.ollamaUrl : undefined,
   };
 
   const assessedCount = Object.keys(assessments).length;
@@ -505,7 +508,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
   return (
     <div className="search-page">
 
-      {/* ── Profile auto-fill toast ── */}
       {profileFillCount > 0 && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9000,
@@ -521,7 +523,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         </div>
       )}
 
-      {/* ── HEADER ── */}
       <header className="search-header">
         <div
           className="search-logo"
@@ -555,10 +556,8 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       {profileOpen && <Profile onClose={() => setProfileOpen(false)} />}
 
       <div className="search-body">
-        {/* ── SIDEBAR ── */}
         <aside className="sidebar">
 
-          {/* Resume */}
           <div>
             <div className="sidebar-section-title">{t('resume')}</div>
             <ResumeUpload
@@ -590,12 +589,11 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
             )}
           </div>
 
-          {/* LLM Status */}
           <div className="llm-status-card">
             <div className="llm-status-row">
               <span className={`status-dot ${llmStatus}`} />
               <span className="llm-status-text">
-                {['ollama', 'lmstudio', 'openclaw'].includes(settings.llmProvider)
+                {LOCAL_PROVIDERS.has(settings.llmProvider)
                   ? `${settings.llmProvider} · ${t('local')}`
                   : `${settings.llmProvider} · ${t('cloud')}`}
               </span>
@@ -619,11 +617,9 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
             </button>
           </div>
 
-          {/* Search Filters */}
           <div>
             <div className="sidebar-section-title">{t('searchFilters')}</div>
 
-            {/* Keywords */}
             <div className="filter-group">
               <div className="filter-label">{t('keywords')}</div>
               <div className="keyword-chips">
@@ -656,7 +652,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                 </div>
               )}
 
-              {/* AI Keyword Tools */}
               {keywords.length > 0 && llmStatus === 'green' && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                   <button className="export-btn" style={{ flex: 1 }} onClick={fetchSuggestions} disabled={loadingSuggestions}>
@@ -693,13 +688,11 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               </div>
             </div>
 
-            {/* Location */}
             <div className="filter-group" style={{ marginTop: 14 }}>
               <div className="filter-label">{t('location')}</div>
               <LocationSelect value={location} onChange={setLocation} />
             </div>
 
-            {/* Job Type */}
             <div className="filter-group" style={{ marginTop: 14 }}>
               <div className="filter-label">{t('jobType')}</div>
               <CustomSelect
@@ -714,7 +707,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               />
             </div>
 
-            {/* Job Boards */}
             <div className="filter-group" style={{ marginTop: 14 }}>
               <div className="filter-label">{t('jobBoards')}</div>
               <div className="site-pills">
@@ -745,7 +737,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               )}
             </div>
 
-            {/* Results count */}
             <div className="filter-group" style={{ marginTop: 14 }}>
               <div className="filter-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>{t('resultsPerSearch')}</span>
@@ -784,7 +775,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
             </div>
           )}
 
-          {/* Search History */}
           {searchHistory.length > 0 && (
             <div className="search-history">
               <div className="search-history-title">
@@ -808,7 +798,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           )}
         </aside>
 
-        {/* ── MAIN CONTENT ── */}
         <main className="main-content">
           {(<>
           {searchPipelineBusy ? (
