@@ -2,18 +2,11 @@ import { useState, useEffect, useCallback, useRef, useId, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDroppable,
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDroppable,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
+  SortableContext, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -25,12 +18,11 @@ import {
   TrendingUp, MoreHorizontal, ArrowRightLeft,
 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
+import { useTranslation } from '../i18n/useTranslation';
 
 const RESUME_CACHE_KEY = 'jumpship_resume_cache';
 
-interface JobTrackerProps {
-  onBack: () => void;
-}
+interface JobTrackerProps { onBack: () => void; }
 
 interface AssessmentData {
   match_score: number;
@@ -66,35 +58,19 @@ export interface ApplicationRecord {
   updated_at: string | null;
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 
 const STATUS_PIPELINE = ['saved', 'applied', 'interviewing', 'offered', 'rejected'] as const;
 type AppStatus = typeof STATUS_PIPELINE[number];
 
-const STATUS_LABELS: Record<AppStatus, string> = {
-  saved: 'Saved',
-  applied: 'Applied',
-  interviewing: 'Interviewing',
-  offered: 'Offered',
-  rejected: 'Rejected',
-};
-
 const STATUS_COLORS: Record<AppStatus, string> = {
-  saved: '#888888',
-  applied: '#60a5fa',
-  interviewing: '#a78bfa',
-  offered: '#4ade80',
-  rejected: '#f87171',
+  saved: '#888888', applied: '#60a5fa', interviewing: '#a78bfa',
+  offered: '#4ade80', rejected: '#f87171',
 };
 
 const STATUS_ICONS: Record<AppStatus, React.ReactNode> = {
-  saved: <Bookmark size={13} />,
-  applied: <CheckCircle2 size={13} />,
-  interviewing: <Users size={13} />,
-  offered: <Trophy size={13} />,
+  saved: <Bookmark size={13} />, applied: <CheckCircle2 size={13} />,
+  interviewing: <Users size={13} />, offered: <Trophy size={13} />,
   rejected: <XCircle size={13} />,
 };
 
@@ -125,35 +101,24 @@ function TrackerScoreRing({ score, size = 38 }: { score: number | null; size?: n
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
       <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--border)" strokeWidth="3" />
       {score !== null && (
-        <circle
-          cx={cx} cy={cx} r={r} fill="none"
-          stroke={color}
-          strokeWidth="3"
-          strokeDasharray={circ}
-          strokeDashoffset={circ * (1 - pct)}
-          strokeLinecap="round"
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth="3"
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)} strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cx})`}
-          style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1)' }}
-        />
+          style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1)' }} />
       )}
       {score !== null && (
         <text x={cx} y={cx} textAnchor="middle" dominantBaseline="central"
-          fill={color} fontSize={size < 38 ? "7" : "9"} fontWeight="700">
-          {score}
-        </text>
+          fill={color} fontSize={size < 38 ? "7" : "9"} fontWeight="700">{score}</text>
       )}
     </svg>
   );
 }
 
-// ── PortalMenu — anchored dropdown rendered at body level (escapes any clipping) ──
+// ── PortalMenu ────────────────────────────────────────────────────────────────
 
 interface PortalMenuProps {
-  open: boolean;
-  anchorRef: React.RefObject<HTMLElement | null>;
-  align?: 'left' | 'right';
-  onClose: () => void;
-  children: React.ReactNode;
+  open: boolean; anchorRef: React.RefObject<HTMLElement | null>;
+  align?: 'left' | 'right'; onClose: () => void; children: React.ReactNode;
 }
 
 function PortalMenu({ open, anchorRef, align = 'left', onClose, children }: PortalMenuProps) {
@@ -163,43 +128,29 @@ function PortalMenu({ open, anchorRef, align = 'left', onClose, children }: Port
   useEffect(() => {
     if (!open || !anchorRef.current) { setPos(null); return; }
     const r = anchorRef.current.getBoundingClientRect();
-    setPos(
-      align === 'right'
-        ? { top: r.bottom + 4, left: 0, right: window.innerWidth - r.right }
-        : { top: r.bottom + 4, left: r.left }
-    );
+    setPos(align === 'right'
+      ? { top: r.bottom + 4, left: 0, right: window.innerWidth - r.right }
+      : { top: r.bottom + 4, left: r.left });
   }, [open, align, anchorRef]);
 
   useEffect(() => {
     if (!open) return;
     const handle = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        anchorRef.current && !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        anchorRef.current && !anchorRef.current.contains(e.target as Node)) onClose();
     };
     const onScroll = () => onClose();
     document.addEventListener('mousedown', handle);
     window.addEventListener('scroll', onScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', handle);
-      window.removeEventListener('scroll', onScroll, true);
-    };
+    return () => { document.removeEventListener('mousedown', handle); window.removeEventListener('scroll', onScroll, true); };
   }, [open, onClose, anchorRef]);
 
   if (!open || !pos) return null;
   return createPortal(
-    <div
-      ref={menuRef}
-      className="portal-menu"
-      style={{
-        position: 'fixed',
-        top: pos.top,
-        ...(align === 'right' ? { right: pos.right } : { left: pos.left }),
-      }}
-    >
+    <div ref={menuRef} className="portal-menu" style={{
+      position: 'fixed', top: pos.top,
+      ...(align === 'right' ? { right: pos.right } : { left: pos.left }),
+    }}>
       {children}
     </div>,
     document.body,
@@ -211,26 +162,19 @@ function PortalMenu({ open, anchorRef, align = 'left', onClose, children }: Port
 type InterviewStage = 'prep' | 'persona' | 'chat' | 'report';
 
 interface SessionData {
-  session_id?: string | null;
-  session_context: string;
-  persona_name: string;
-  persona_bio: string;
-  interview_track?: string;
-  messages?: ChatMessage[];
-  completed?: boolean;
+  session_id?: string | null; session_context: string;
+  persona_name: string; persona_bio: string;
+  interview_track?: string; messages?: ChatMessage[]; completed?: boolean;
 }
 
 interface InterviewReport {
-  score: number;
-  strengths: string[];
-  improvements: string[];
-  technical_gaps: string[];
-  study_tips: string[];
-  next_steps: string[];
+  score: number; strengths: string[]; improvements: string[];
+  technical_gaps: string[]; study_tips: string[]; next_steps: string[];
 }
 
 function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () => void }) {
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   const getLlmFields = (featureModel?: string) => {
     const keyMap: Record<string, string> = {
@@ -258,23 +202,18 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
   const [reportLoading, setReportLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
 
   useEffect(() => {
     let cancelled = false;
     async function init() {
       try {
         const res = await fetch('/api/interview/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            job_title: app.job_title,
-            company_name: app.company_name,
+            job_title: app.job_title, company_name: app.company_name,
             job_description: app.job_description || '',
-            resume_text: getCachedResumeText(),
-            application_id: app.id,
+            resume_text: getCachedResumeText(), application_id: app.id,
             ...getLlmFields(settings.interviewLlmModel),
           }),
         });
@@ -284,11 +223,9 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
           setPrepStatus('Building your interviewer persona…');
           await new Promise(r => setTimeout(r, 400));
           setSession(data);
-          // Resume path: server returned existing messages
           if (data.messages && data.messages.length > 0) {
             setMessages(data.messages);
             setStage(data.completed ? 'persona' : 'chat');
-            // Auto-load existing report if interview was completed
             if (data.completed && data.session_id) {
               try {
                 const r = await fetch(`/api/interview/by-application/${app.id}`);
@@ -296,9 +233,7 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
                 if (d.report && !cancelled) setReport(d.report);
               } catch { /* noop */ }
             }
-          } else {
-            setStage('persona');
-          }
+          } else { setStage('persona'); }
         }
       } catch (err) {
         if (!cancelled) setPrepStatus(`Failed to initialize: ${String(err)}`);
@@ -311,21 +246,18 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
   const startChat = useCallback(async () => {
     if (!session) return;
     setStage('chat');
-    if (messages.length > 0) return;  // Resumed: skip auto-greeting
+    if (messages.length > 0) return;
     setIsLoading(true);
     try {
       const res = await fetch('/api/interview/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: session.session_id, session_context: session.session_context, persona_name: session.persona_name, messages: [], message: '', ...getLlmFields(settings.interviewLlmModel) }),
       });
       const data = await res.json();
       setMessages([{ role: 'assistant', content: data.content }]);
     } catch {
       setMessages([{ role: 'assistant', content: 'Hello! Ready to begin the interview?' }]);
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   }, [session, messages.length]);
 
   const sendMessage = useCallback(async () => {
@@ -336,17 +268,14 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
     setIsLoading(true);
     try {
       const res = await fetch('/api/interview/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: session.session_id, session_context: session.session_context, persona_name: session.persona_name, messages, message: text, ...getLlmFields(settings.interviewLlmModel) }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error — please try again.' }]);
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   }, [session, input, messages, isLoading]);
 
   const generateReport = useCallback(async () => {
@@ -355,8 +284,7 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
     setStage('report');
     try {
       const res = await fetch('/api/interview/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: session.session_id, ...getLlmFields(settings.interviewLlmModel) }),
       });
       if (!res.ok) {
@@ -366,17 +294,8 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
       const data = await res.json();
       setReport(data.report);
     } catch (err) {
-      setReport({
-        score: 0,
-        strengths: [],
-        improvements: [`Failed to generate report: ${String(err)}`],
-        technical_gaps: [],
-        study_tips: [],
-        next_steps: [],
-      });
-    } finally {
-      setReportLoading(false);
-    }
+      setReport({ score: 0, strengths: [], improvements: [`Failed to generate report: ${String(err)}`], technical_gaps: [], study_tips: [], next_steps: [] });
+    } finally { setReportLoading(false); }
   }, [session, messages.length]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -385,19 +304,16 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-panel"
-        onClick={e => e.stopPropagation()}
-        style={{ width: 680, maxWidth: '95vw', height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}
-      >
-        {/* Header */}
+      <div className="modal-panel" onClick={e => e.stopPropagation()}
+        style={{ width: 680, maxWidth: '95vw', height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
+
         <div className="modal-header" style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MessageSquare size={17} style={{ color: '#a78bfa' }} />
             </div>
             <div>
-              <div className="modal-title" style={{ fontSize: 16 }}>Mock Interview</div>
+              <div className="modal-title" style={{ fontSize: 16 }}>{t('mockInterview')}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
                 {app.job_title}{app.company_name ? ` · ${app.company_name}` : ''}
               </div>
@@ -410,7 +326,7 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
         {stage === 'prep' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40, textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--gold)', animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Preparing Your Interview</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{t('preparingInterview')}</div>
             <div style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 340, lineHeight: 1.6 }}>{prepStatus}</div>
           </div>
         )}
@@ -429,7 +345,7 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
               {session.persona_bio}
             </div>
             <button onClick={startChat} className="btn btn-primary">
-              <MessageSquare size={15} /> Begin Interview
+              <MessageSquare size={15} /> {t('beginInterview')}
             </button>
           </div>
         )}
@@ -467,29 +383,16 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
             </div>
             <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0, alignItems: 'flex-end' }}>
               <textarea
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
-                rows={2}
+                value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                placeholder={t('typeAnswer')} rows={2}
                 style={{ flex: 1, resize: 'none', background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5 }}
               />
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading}
-                className="btn btn-primary btn-icon"
-                aria-label="Send message"
-              >
+              <button onClick={sendMessage} disabled={!input.trim() || isLoading} className="btn btn-primary btn-icon" aria-label="Send message">
                 <Send size={15} />
               </button>
-              <button
-                onClick={generateReport}
-                disabled={messages.length < 4 || isLoading}
-                className="btn btn-secondary"
-                title="End interview and generate performance report"
-                aria-label="End interview and generate report"
-              >
-                <Trophy size={14} /> End & Report
+              <button onClick={generateReport} disabled={messages.length < 4 || isLoading} className="btn btn-secondary"
+                title={t('endAndReport')} aria-label={t('endAndReport')}>
+                <Trophy size={14} /> {t('endAndReport')}
               </button>
             </div>
           </>
@@ -501,7 +404,7 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
             {reportLoading && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
                 <Loader2 size={28} className="spin" style={{ color: 'var(--gold)' }} />
-                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Analyzing your interview…</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>{t('analyzingInterview')}</div>
               </div>
             )}
             {report && !reportLoading && (
@@ -511,25 +414,23 @@ function InterviewPanel({ app, onClose }: { app: ApplicationRecord; onClose: () 
                     {report.score}
                   </div>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Performance Report</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{t('performanceReport')}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{app.job_title} · {app.company_name}</div>
                   </div>
                 </div>
-
-                <ReportSection title="Strengths" color="#4ade80" items={report.strengths} />
-                <ReportSection title="Improvements" color="#f87171" items={report.improvements} />
+                <ReportSection title={t('strengths')} color="#4ade80" items={report.strengths} />
+                <ReportSection title={t('improvements')} color="#f87171" items={report.improvements} />
                 {report.technical_gaps.length > 0 && (
-                  <ReportSection title="Technical Gaps" color="#fbbf24" items={report.technical_gaps} />
+                  <ReportSection title={t('technicalGaps')} color="#fbbf24" items={report.technical_gaps} />
                 )}
-                <ReportSection title="Study Tips" color="#60a5fa" items={report.study_tips} />
-                <ReportSection title="Next Steps" color="#a78bfa" items={report.next_steps} />
-
+                <ReportSection title={t('studyTips')} color="#60a5fa" items={report.study_tips} />
+                <ReportSection title={t('nextSteps')} color="#a78bfa" items={report.next_steps} />
                 <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
                   <button onClick={() => setStage('chat')} className="btn btn-secondary">
-                    <MessageSquare size={14} /> Back to Transcript
+                    <MessageSquare size={14} /> {t('backToTranscript')}
                   </button>
                   <button onClick={onClose} className="btn btn-primary">
-                    <CheckCircle2 size={14} /> Done
+                    <CheckCircle2 size={14} /> {t('done2')}
                   </button>
                 </div>
               </div>
@@ -547,7 +448,7 @@ function ReportSection({ title, color, items }: { title: string; color: string; 
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color, marginBottom: 6 }}>{title}</div>
       <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text)', fontSize: 13, lineHeight: 1.7 }}>
-        {items.map((it, i) => (<li key={i} style={{ marginBottom: 4 }}>{it}</li>))}
+        {items.map((it, i) => <li key={i} style={{ marginBottom: 4 }}>{it}</li>)}
       </ul>
     </div>
   );
@@ -557,6 +458,7 @@ function ReportSection({ title, color, items }: { title: string; color: string; 
 
 function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClose: () => void }) {
   const { settings } = useSettings();
+  const { t } = useTranslation();
   const fileInputId = useId();
   const [resumeText, setResumeText] = useState(getCachedResumeText);
 
@@ -575,19 +477,18 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
       llm_base_url: settings.ollamaUrl || undefined,
     };
   };
+
   const [customInstructions, setCustomInstructions] = useState('');
   const [extraContext, setExtraContext] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
-
   const hasJobDescription = !!app.job_description;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingFile(true);
-    setError(null);
+    setUploadingFile(true); setError(null);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -597,23 +498,17 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
       const text = data.raw_text ?? data.profile?.raw_text ?? '';
       if (text) setResumeText(text);
       else setError('Could not extract text from file.');
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setUploadingFile(false);
-      e.target.value = '';
-    }
+    } catch (err) { setError(String(err)); }
+    finally { setUploadingFile(false); e.target.value = ''; }
   };
 
   const handleGenerate = async () => {
     if (!resumeText.trim()) { setError('Resume text is required.'); return; }
     if (!hasJobDescription) { setError('No job description — cannot generate tailored resume.'); return; }
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
       const res = await fetch('/api/resume/generate-for-application', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id, resume_text: resumeText, custom_instructions: customInstructions.trim() || null, extra_context: extraContext.trim() || null, ...getLlmFields(settings.resumeGenLlmModel) }),
       });
       if (!res.ok) {
@@ -628,11 +523,8 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
       a.click();
       URL.revokeObjectURL(url);
       onClose();
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { setError(String(err)); }
+    finally { setIsLoading(false); }
   };
 
   const ta: React.CSSProperties = {
@@ -643,75 +535,67 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
   };
 
   const fieldLabel: React.CSSProperties = {
-    display: 'block', fontSize: 13, fontWeight: 600,
-    color: 'var(--text)', marginBottom: 8,
+    display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8,
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-panel"
-        onClick={e => e.stopPropagation()}
-        style={{ width: 660, maxWidth: '95vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
-      >
-        {/* Header */}
+      <div className="modal-panel" onClick={e => e.stopPropagation()}
+        style={{ width: 660, maxWidth: '95vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+
         <div className="modal-header" style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileDown size={17} style={{ color: '#60a5fa' }} />
             </div>
             <div>
-              <div className="modal-title" style={{ fontSize: 16 }}>Generate Tailored Resume</div>
+              <div className="modal-title" style={{ fontSize: 16 }}>{t('generateTailoredResume')}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
                 {app.job_title}{app.company_name ? ` · ${app.company_name}` : ''}
-                {!hasJobDescription && <span style={{ color: '#f87171', marginLeft: 8 }}>⚠ No job description</span>}
+                {!hasJobDescription && <span style={{ color: '#f87171', marginLeft: 8 }}>⚠ {t('noJobDescription')}</span>}
               </div>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
 
-        {/* Body */}
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Resume text */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <label style={fieldLabel}>
-                Resume Text
+                {t('resumeText')}
                 <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
                   {resumeText ? `${resumeText.length.toLocaleString()} chars` : 'none loaded'}
                 </span>
               </label>
-              <label
-                htmlFor={fileInputId}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, color: '#60a5fa', padding: '5px 12px', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, background: 'rgba(96,165,250,0.06)', opacity: uploadingFile ? 0.5 : 1, transition: 'background 0.15s' }}
-              >
+              <label htmlFor={fileInputId} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, color: '#60a5fa', padding: '5px 12px', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, background: 'rgba(96,165,250,0.06)', opacity: uploadingFile ? 0.5 : 1, transition: 'background 0.15s' }}>
                 {uploadingFile ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={12} />}
-                {uploadingFile ? 'Parsing…' : 'Upload PDF / DOCX'}
+                {uploadingFile ? t('loading') : 'Upload PDF / DOCX'}
               </label>
               <input id={fileInputId} type="file" accept=".pdf,.docx,.doc,.txt" style={{ display: 'none' }} onChange={handleFileUpload} disabled={uploadingFile} />
             </div>
-            <textarea value={resumeText} onChange={e => setResumeText(e.target.value)} placeholder="Paste your resume text here, or upload a file above…" rows={7} style={ta} />
+            <textarea value={resumeText} onChange={e => setResumeText(e.target.value)} placeholder="Cole o texto do currículo aqui, ou envie um arquivo acima…" rows={7} style={ta} />
           </div>
 
-          {/* Custom instructions */}
           <div>
             <label style={fieldLabel}>
               <Sparkles size={13} style={{ verticalAlign: 'middle', marginRight: 6, color: '#a78bfa' }} />
-              Custom Instructions
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>optional</span>
+              {t('customInstructions')}
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>{t('optional')}</span>
             </label>
-            <textarea value={customInstructions} onChange={e => setCustomInstructions(e.target.value)} placeholder={'e.g. "Emphasize Python and ML experience" · "Move certifications to the top" · "Use stronger action verbs"'} rows={3} style={ta} />
+            <textarea value={customInstructions} onChange={e => setCustomInstructions(e.target.value)}
+              placeholder={'ex. "Enfatize experiência com Python e React" · "Mova certificações para o topo"'}
+              rows={3} style={ta} />
           </div>
 
-          {/* Extra context */}
           <div>
             <label style={fieldLabel}>
-              Additional Information
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>optional — new projects, certs, skills not yet on resume</span>
+              {t('additionalInfo')}
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>{t('additionalInfoDesc')}</span>
             </label>
-            <textarea value={extraContext} onChange={e => setExtraContext(e.target.value)} placeholder={'e.g. "Completed AWS Solutions Architect cert in March 2025" · "Led Kubernetes migration at previous role"'} rows={3} style={ta} />
+            <textarea value={extraContext} onChange={e => setExtraContext(e.target.value)}
+              placeholder={'ex. "AWS Solutions Architect Associate — Março 2025" · "Liderou migração Kubernetes"'}
+              rows={3} style={ta} />
           </div>
 
           {error && (
@@ -721,19 +605,13 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
           )}
         </div>
 
-        {/* Footer */}
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>Cancel</button>
-          <button
-            className="btn btn-primary"
-            onClick={handleGenerate}
-            disabled={isLoading || !resumeText.trim() || !hasJobDescription}
-            style={{ minWidth: 160 }}
-          >
+          <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>{t('cancel')}</button>
+          <button className="btn btn-primary" onClick={handleGenerate}
+            disabled={isLoading || !resumeText.trim() || !hasJobDescription} style={{ minWidth: 160 }}>
             {isLoading
-              ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />Generating…</>
-              : <><FileDown size={15} />Generate PDF</>
-            }
+              ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />{t('generating')}</>
+              : <><FileDown size={15} />{t('generatePDF')}</>}
           </button>
         </div>
       </div>
@@ -744,13 +622,23 @@ function ResumeGeneratorModal({ app, onClose }: { app: ApplicationRecord; onClos
 // ── Add Job Modal ─────────────────────────────────────────────────────────────
 
 function AddJobModal({ onClose, onAdd }: { onClose: () => void; onAdd: (job: Partial<ApplicationRecord>) => void }) {
+  const { t } = useTranslation();
   const [jobTitle, setJobTitle] = useState('');
   const [company, setCompany] = useState('');
   const [jobUrl, setJobUrl] = useState('');
   const [status, setStatus] = useState<AppStatus>('saved');
   const [notes, setNotes] = useState('');
 
-  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' };
+  const STATUS_LABELS: Record<AppStatus, string> = {
+    saved: t('saved'), applied: t('applied'),
+    interviewing: t('interviewing'), offered: t('offered'), rejected: t('rejected'),
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: 'var(--bg3)', color: 'var(--text)',
+    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+    padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box',
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -760,29 +648,39 @@ function AddJobModal({ onClose, onAdd }: { onClose: () => void; onAdd: (job: Par
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={17} style={{ color: 'var(--gold)' }} />
             </div>
-            <div className="modal-title" style={{ fontSize: 16 }}>Add Job to Tracker</div>
+            <div className="modal-title" style={{ fontSize: 16 }}>{t('addJobToTracker')}</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="profile-field"><label>Job Title *</label><input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Software Engineer" autoFocus style={inputStyle} /></div>
-          <div className="profile-field"><label>Company</label><input type="text" value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Inc." style={inputStyle} /></div>
-          <div className="profile-field"><label>Job URL</label><input type="url" value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://..." style={inputStyle} /></div>
           <div className="profile-field">
-            <label>Status</label>
+            <label>{t('jobTitle')} *</label>
+            <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Desenvolvedor Full Stack" autoFocus style={inputStyle} />
+          </div>
+          <div className="profile-field">
+            <label>{t('company')}</label>
+            <input type="text" value={company} onChange={e => setCompany(e.target.value)} placeholder="Empresa Ltda." style={inputStyle} />
+          </div>
+          <div className="profile-field">
+            <label>{t('jobUrl')}</label>
+            <input type="url" value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
+          </div>
+          <div className="profile-field">
+            <label>{t('status')}</label>
             <select value={status} onChange={e => setStatus(e.target.value as AppStatus)} style={{ ...inputStyle }}>
               {STATUS_PIPELINE.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
             </select>
           </div>
           <div className="profile-field">
-            <label>Notes</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes…" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+            <label>{t('notes')}</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('notesPlaceholder')} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
         </div>
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!jobTitle.trim()} onClick={() => { if (jobTitle.trim()) onAdd({ job_title: jobTitle.trim(), company_name: company.trim(), job_url: jobUrl.trim(), status, notes: notes.trim(), site: '', is_easy_apply: false }); }}>
-            Add Job
+          <button className="btn btn-secondary" onClick={onClose}>{t('cancel')}</button>
+          <button className="btn btn-primary" disabled={!jobTitle.trim()}
+            onClick={() => { if (jobTitle.trim()) onAdd({ job_title: jobTitle.trim(), company_name: company.trim(), job_url: jobUrl.trim(), status, notes: notes.trim(), site: '', is_easy_apply: false }); }}>
+            {t('addJob')}
           </button>
         </div>
       </div>
@@ -795,8 +693,7 @@ function AddJobModal({ onClose, onAdd }: { onClose: () => void; onAdd: (job: Par
 function DraggableCard({
   app, isExpanded, onExpand, onStatusChange, onDelete, onInterview, onGenerateResume, onNotesChange, isDragging,
 }: {
-  app: ApplicationRecord;
-  isExpanded: boolean;
+  app: ApplicationRecord; isExpanded: boolean;
   onExpand: (id: string | null) => void;
   onStatusChange: (id: string, status: AppStatus) => void;
   onDelete: (id: string) => void;
@@ -805,6 +702,7 @@ function DraggableCard({
   onNotesChange: (id: string, notes: string) => void;
   isDragging?: boolean;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: app.id });
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
@@ -812,41 +710,35 @@ function DraggableCard({
   const overflowBtnRef = useRef<HTMLButtonElement>(null);
   const [localNotes, setLocalNotes] = useState(app.notes || '');
 
+  const STATUS_LABELS: Record<AppStatus, string> = {
+    saved: t('saved'), applied: t('applied'),
+    interviewing: t('interviewing'), offered: t('offered'), rejected: t('rejected'),
+  };
+
   const scoreVal = app.match_score ?? app.assessment_data?.match_score ?? null;
   const color = STATUS_COLORS[app.status as AppStatus] ?? '#888';
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.35 : 1,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : 1 };
 
   const savedDate = app.created_at
-    ? new Date(app.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    ? new Date(app.created_at).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' })
     : null;
 
-  const handleNotesSave = () => {
-    if (localNotes !== app.notes) onNotesChange(app.id, localNotes);
-  };
-
+  const handleNotesSave = () => { if (localNotes !== app.notes) onNotesChange(app.id, localNotes); };
   const toggleExpand = () => onExpand(isExpanded ? null : app.id);
 
   return (
     <div ref={setNodeRef} style={style} className={`tracker-card${isExpanded ? ' expanded' : ''}`}>
-      {/* Colored accent bar */}
       <div style={{ height: 3, background: color }} />
 
-      {/* Card inner */}
       <div className="tracker-card-inner">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <button {...attributes} {...listeners} style={{ cursor: 'grab', background: 'none', border: 'none', padding: '2px 0', color: 'var(--text-muted)', flexShrink: 0, marginTop: 9 }} aria-label="Drag">
             <GripVertical size={14} />
           </button>
-
           <div style={{ flexShrink: 0, marginTop: 2 }}>
             <TrackerScoreRing score={scoreVal} size={isExpanded ? 44 : 38} />
           </div>
-
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tracker-card-title" style={{ fontSize: isExpanded ? 16 : 14 }}>{app.job_title || 'Untitled Role'}</div>
             <div className="tracker-card-company" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
@@ -857,17 +749,15 @@ function DraggableCard({
             {savedDate && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)', marginTop: 3, opacity: 0.65 }}>
                 <Calendar size={10} />
-                Saved {savedDate}
+                {savedDate}
               </div>
             )}
           </div>
-
           <button className={`tracker-card-expand-btn${isExpanded ? ' open' : ''}`} onClick={toggleExpand} style={{ marginTop: 4 }} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
             <ChevronDown size={15} />
           </button>
         </div>
 
-        {/* Tags */}
         {app.assessment_data?.job_tags && app.assessment_data.job_tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
             {app.assessment_data.job_tags.slice(0, isExpanded ? 8 : 4).map(tag => (
@@ -877,54 +767,34 @@ function DraggableCard({
         )}
       </div>
 
-      {/* Action row — hierarchy: Apply > Resume > Interview > Move > overflow (Delete) */}
       <div className="tracker-card-actions">
         {app.job_url ? (
-          <a
-            href={app.job_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tracker-action-btn primary"
-            style={{ textDecoration: 'none' }}
-            aria-label="Open job posting"
-          >
-            <ExternalLink size={13} /> Apply
+          <a href={app.job_url} target="_blank" rel="noopener noreferrer"
+            className="tracker-action-btn primary" style={{ textDecoration: 'none' }} aria-label="Open job posting">
+            <ExternalLink size={13} /> {t('apply')}
           </a>
         ) : null}
-
         <button className="tracker-action-btn resume" onClick={() => onGenerateResume(app)} aria-label="Generate tailored resume">
-          <FileDown size={13} /> Resume
+          <FileDown size={13} /> {t('resume')}
         </button>
-
         <button className="tracker-action-btn interview" onClick={() => onInterview(app)} aria-label="Start mock interview">
-          <MessageSquare size={13} /> Interview
+          <MessageSquare size={13} /> {t('interview')}
         </button>
-
-        <button
-          ref={moveBtnRef}
-          type="button"
-          className="tracker-action-btn"
-          onClick={() => setShowStatusMenu(v => !v)}
-          aria-label="Change status"
-        >
-          <ArrowRightLeft size={12} /> Move <ChevronDown size={12} strokeWidth={1.75} />
+        <button ref={moveBtnRef} type="button" className="tracker-action-btn"
+          onClick={() => setShowStatusMenu(v => !v)} aria-label="Change status">
+          <ArrowRightLeft size={12} /> {t('move')} <ChevronDown size={12} strokeWidth={1.75} />
         </button>
-
-        <button
-          ref={overflowBtnRef}
-          type="button"
-          className="tracker-action-btn"
-          onClick={() => setShowOverflow(v => !v)}
-          aria-label="More actions"
-          style={{ marginLeft: 'auto' }}
-        >
+        <button ref={overflowBtnRef} type="button" className="tracker-action-btn"
+          onClick={() => setShowOverflow(v => !v)} aria-label="More actions" style={{ marginLeft: 'auto' }}>
           <MoreHorizontal size={14} />
         </button>
       </div>
 
       <PortalMenu open={showStatusMenu} anchorRef={moveBtnRef} align="left" onClose={() => setShowStatusMenu(false)}>
         {STATUS_PIPELINE.map(s => (
-          <div key={s} className="portal-menu-item" style={{ color: s === app.status ? STATUS_COLORS[s] : 'var(--text)', fontWeight: s === app.status ? 600 : 400 }} onClick={() => { onStatusChange(app.id, s); setShowStatusMenu(false); }}>
+          <div key={s} className="portal-menu-item"
+            style={{ color: s === app.status ? STATUS_COLORS[s] : 'var(--text)', fontWeight: s === app.status ? 600 : 400 }}
+            onClick={() => { onStatusChange(app.id, s); setShowStatusMenu(false); }}>
             <span style={{ color: STATUS_COLORS[s], display: 'inline-flex' }}>{STATUS_ICONS[s]}</span>
             {STATUS_LABELS[s]}
           </div>
@@ -932,96 +802,86 @@ function DraggableCard({
       </PortalMenu>
 
       <PortalMenu open={showOverflow} anchorRef={overflowBtnRef} align="right" onClose={() => setShowOverflow(false)}>
-        <div className="portal-menu-item" style={{ color: '#f87171' }} onClick={() => { setShowOverflow(false); onDelete(app.id); }}>
-          <Trash2 size={13} /> Delete
+        <div className="portal-menu-item" style={{ color: '#f87171' }}
+          onClick={() => { setShowOverflow(false); onDelete(app.id); }}>
+          <Trash2 size={13} /> {t('delete')}
         </div>
       </PortalMenu>
 
-      {/* Expandable body */}
       <AnimatePresence initial={false}>
         {isExpanded && (
-          <motion.div
-            className="tracker-card-body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+          <motion.div className="tracker-card-body"
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-          >
-            {/* Scrollable inner — content never overflows the card */}
+            transition={{ type: 'spring', stiffness: 350, damping: 35 }}>
             <div style={{ maxHeight: '54vh', overflowY: 'auto', padding: '0 14px 14px' }}>
-            {/* Assessment */}
-            {app.assessment_data && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
-                  <BarChart2 size={12} style={{ color: '#a78bfa' }} /> Assessment
-                </div>
-                <div className="tracker-assessment-section">
-                  {app.assessment_data.summary && <p style={{ marginBottom: 8, lineHeight: 1.65 }}>{app.assessment_data.summary}</p>}
-                  {app.assessment_data.strong_points.length > 0 && (
-                    <div style={{ marginBottom: 6, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
-                      <span style={{ color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Strong:</span>
-                      <span>{app.assessment_data.strong_points.join(' · ')}</span>
-                    </div>
-                  )}
-                  {app.assessment_data.gaps.length > 0 && (
-                    <div style={{ marginBottom: 6, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
-                      <span style={{ color: '#f87171', fontWeight: 700, whiteSpace: 'nowrap' }}>✗ Gaps:</span>
-                      <span>{app.assessment_data.gaps.join(' · ')}</span>
-                    </div>
-                  )}
-                  {app.assessment_data.income_range && (
-                    <div style={{ marginTop: 6, color: '#fbbf24', fontWeight: 600, fontSize: 12 }}>
-                      💰 {app.assessment_data.income_range}
-                    </div>
-                  )}
-                  {app.assessment_data.keywords_matched?.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Keywords matched:</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {app.assessment_data.keywords_matched.slice(0, 10).map(k => (
-                          <span key={k} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }}>{k}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {app.assessment_data.keywords_missing?.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Keywords missing:</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {app.assessment_data.keywords_missing.slice(0, 10).map(k => (
-                          <span key={k} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(248,113,113,0.08)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}>{k}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Job description */}
-            {app.job_description && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
-                  <FileText size={12} style={{ color: '#60a5fa' }} /> Job Description
+              {app.assessment_data && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
+                    <BarChart2 size={12} style={{ color: '#a78bfa' }} /> {t('assessment')}
+                  </div>
+                  <div className="tracker-assessment-section">
+                    {app.assessment_data.summary && <p style={{ marginBottom: 8, lineHeight: 1.65 }}>{app.assessment_data.summary}</p>}
+                    {app.assessment_data.strong_points.length > 0 && (
+                      <div style={{ marginBottom: 6, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                        <span style={{ color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ {t('strong')}:</span>
+                        <span>{app.assessment_data.strong_points.join(' · ')}</span>
+                      </div>
+                    )}
+                    {app.assessment_data.gaps.length > 0 && (
+                      <div style={{ marginBottom: 6, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                        <span style={{ color: '#f87171', fontWeight: 700, whiteSpace: 'nowrap' }}>✗ {t('gaps')}:</span>
+                        <span>{app.assessment_data.gaps.join(' · ')}</span>
+                      </div>
+                    )}
+                    {app.assessment_data.income_range && (
+                      <div style={{ marginTop: 6, color: '#fbbf24', fontWeight: 600, fontSize: 12 }}>
+                        💰 {app.assessment_data.income_range}
+                      </div>
+                    )}
+                    {app.assessment_data.keywords_matched?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{t('keywordsMatched')}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {app.assessment_data.keywords_matched.slice(0, 10).map(k => (
+                            <span key={k} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }}>{k}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {app.assessment_data.keywords_missing?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{t('keywordsMissing')}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {app.assessment_data.keywords_missing.slice(0, 10).map(k => (
+                            <span key={k} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(248,113,113,0.08)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}>{k}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="tracker-jd-scroll" style={{ maxHeight: 200 }}>{app.job_description}</div>
-              </div>
-            )}
+              )}
 
-            {/* Notes */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
-                <StickyNote size={12} style={{ color: '#fbbf24' }} /> Notes
+              {app.job_description && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
+                    <FileText size={12} style={{ color: '#60a5fa' }} /> {t('jobDescription')}
+                  </div>
+                  <div className="tracker-jd-scroll" style={{ maxHeight: 200 }}>{app.job_description}</div>
+                </div>
+              )}
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
+                  <StickyNote size={12} style={{ color: '#fbbf24' }} /> {t('notes')}
+                </div>
+                <textarea className="tracker-notes-field" value={localNotes}
+                  onChange={e => setLocalNotes(e.target.value)} onBlur={handleNotesSave}
+                  placeholder={t('notesPlaceholder')} />
               </div>
-              <textarea
-                className="tracker-notes-field"
-                value={localNotes}
-                onChange={e => setLocalNotes(e.target.value)}
-                onBlur={handleNotesSave}
-                placeholder="Add notes about this application…"
-              />
             </div>
-            </div>{/* end scrollable inner */}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1034,44 +894,38 @@ function DraggableCard({
 function KanbanColumn({
   status, apps, expandedCardId, onExpand, onStatusChange, onDelete, onInterview, onGenerateResume, onNotesChange, activeId, colWidth,
 }: {
-  status: AppStatus;
-  apps: ApplicationRecord[];
-  expandedCardId: string | null;
+  status: AppStatus; apps: ApplicationRecord[]; expandedCardId: string | null;
   onExpand: (id: string | null) => void;
   onStatusChange: (id: string, s: AppStatus) => void;
   onDelete: (id: string) => void;
   onInterview: (app: ApplicationRecord) => void;
   onGenerateResume: (app: ApplicationRecord) => void;
   onNotesChange: (id: string, notes: string) => void;
-  activeId: string | null;
-  colWidth: number;
+  activeId: string | null; colWidth: number;
 }) {
+  const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const color = STATUS_COLORS[status];
   const isThisColumnExpanded = apps.some(a => a.id === expandedCardId);
 
+  const STATUS_LABELS: Record<AppStatus, string> = {
+    saved: t('saved'), applied: t('applied'),
+    interviewing: t('interviewing'), offered: t('offered'), rejected: t('rejected'),
+  };
+
   return (
-    <motion.div
-      animate={{ width: colWidth }}
+    <motion.div animate={{ width: colWidth }}
       transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.9 }}
-      style={{ flexShrink: 0, overflow: 'visible' }}
-    >
-      <div
-        ref={setNodeRef}
-        className="pipeline-col"
-        style={{
-          outline: isOver ? `2px solid ${color}` : undefined,
-          transition: 'outline 0.1s',
-          width: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Colored top accent */}
+      style={{ flexShrink: 0, overflow: 'visible' }}>
+      <div ref={setNodeRef} className="pipeline-col" style={{
+        outline: isOver ? `2px solid ${color}` : undefined,
+        transition: 'outline 0.1s', width: '100%', overflow: 'hidden',
+      }}>
         <div style={{ height: 3, background: color, flexShrink: 0 }} />
 
-        {/* Collapsed — slim header, mini card bars */}
         {!isThisColumnExpanded && expandedCardId !== null ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }} onClick={() => onExpand(null)} title={`${STATUS_LABELS[status]} — click to restore`}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }}
+            onClick={() => onExpand(null)} title={`${STATUS_LABELS[status]} — click to restore`}>
             <div className="pipeline-col-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
                 <span style={{ color, flexShrink: 0 }}>{STATUS_ICONS[status]}</span>
@@ -1081,15 +935,12 @@ function KanbanColumn({
             </div>
             {apps.length > 0 && (
               <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {apps.map(a => (
-                  <div key={a.id} style={{ height: 5, borderRadius: 3, background: color, opacity: 0.35, flexShrink: 0 }} title={a.job_title} />
-                ))}
+                {apps.map(a => <div key={a.id} style={{ height: 5, borderRadius: 3, background: color, opacity: 0.35, flexShrink: 0 }} title={a.job_title} />)}
               </div>
             )}
           </div>
         ) : (
           <>
-            {/* Column header */}
             <div className="pipeline-col-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -1099,23 +950,16 @@ function KanbanColumn({
                 <span className="pipeline-col-badge">{apps.length}</span>
               </div>
             </div>
-
-            {/* Cards scrollable area */}
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <SortableContext items={apps.map(a => a.id)} strategy={verticalListSortingStrategy}>
-                {apps.length === 0 && <div className="pipeline-col-empty">Drop here</div>}
+                {apps.length === 0 && <div className="pipeline-col-empty">{t('dropHere')}</div>}
                 {apps.map(app => (
-                  <DraggableCard
-                    key={app.id} app={app}
+                  <DraggableCard key={app.id} app={app}
                     isExpanded={expandedCardId === app.id}
-                    onExpand={onExpand}
-                    onStatusChange={onStatusChange}
-                    onDelete={onDelete}
-                    onInterview={onInterview}
-                    onGenerateResume={onGenerateResume}
-                    onNotesChange={onNotesChange}
-                    isDragging={activeId === app.id}
-                  />
+                    onExpand={onExpand} onStatusChange={onStatusChange}
+                    onDelete={onDelete} onInterview={onInterview}
+                    onGenerateResume={onGenerateResume} onNotesChange={onNotesChange}
+                    isDragging={activeId === app.id} />
                 ))}
               </SortableContext>
             </div>
@@ -1129,6 +973,7 @@ function KanbanColumn({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JobTracker({ onBack }: JobTrackerProps) {
+  const { t } = useTranslation();
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1147,11 +992,8 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setApplications(data.applications || data || []);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(String(e)); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchApplications(); }, [fetchApplications]);
@@ -1189,10 +1031,7 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
     } catch { setError('Failed to add job.'); }
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(String(event.active.id));
-    setExpandedCardId(null);
-  };
+  const handleDragStart = (event: DragStartEvent) => { setActiveId(String(event.active.id)); setExpandedCardId(null); };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveId(null);
@@ -1212,9 +1051,7 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
   useEffect(() => {
     const el = pipelineRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      setContainerWidth(entries[0].contentRect.width);
-    });
+    const ro = new ResizeObserver(entries => { setContainerWidth(entries[0].contentRect.width); });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -1240,6 +1077,11 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
     return acc;
   }, {});
 
+  const STATUS_LABELS: Record<AppStatus, string> = {
+    saved: t('saved'), applied: t('applied'),
+    interviewing: t('interviewing'), offered: t('offered'), rejected: t('rejected'),
+  };
+
   const avgScore = (() => {
     const scored = applications.filter(a => (a.match_score ?? a.assessment_data?.match_score) != null);
     if (!scored.length) return null;
@@ -1251,24 +1093,23 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
       <header className="tracker-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button type="button" onClick={onBack} className="btn btn-secondary btn-sm">
-            <ArrowLeft size={15} strokeWidth={1.75} /> Back
+            <ArrowLeft size={15} strokeWidth={1.75} /> {t('back')}
           </button>
           <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.3px' }}>
-              Job <span style={{ color: 'var(--gold)' }}>Tracker</span>
+              Job <span style={{ color: 'var(--gold)' }}>{t('tracker')}</span>
             </h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
-              {applications.length} application{applications.length !== 1 ? 's' : ''} · click cards to expand details
+              {applications.length} {applications.length !== 1 ? t('applicationsPlural') : t('applications')} · {t('clickToExpand')}
             </p>
           </div>
         </div>
         <button type="button" onClick={() => setShowAddModal(true)} className="btn btn-primary btn-sm">
-          <Plus size={15} strokeWidth={2} /> Add Job
+          <Plus size={15} strokeWidth={2} /> {t('addJob')}
         </button>
       </header>
 
-      {/* Stats bar */}
       <div className="tracker-stats" style={{ flexWrap: 'wrap', gap: 8 }}>
         {STATUS_PIPELINE.map(s => (
           <div key={s} className="tracker-stat-pill" style={{ borderColor: stats[s] > 0 ? `${STATUS_COLORS[s]}33` : undefined }}>
@@ -1280,7 +1121,7 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
         {avgScore !== null && (
           <div className="tracker-avg-score" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <TrendingUp size={13} />
-            {avgScore} avg score
+            {avgScore} {t('avgScore')}
           </div>
         )}
       </div>
@@ -1297,30 +1138,21 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', opacity: 0.4 }} />
-          Loading applications…
+          {t('loadingApplications')}
         </div>
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="tracker-pipeline" ref={pipelineRef} style={{ gap: COL_GAP }}>
             {STATUS_PIPELINE.map(col => {
               const isThisColExpanded = applications.some(a => a.id === expandedCardId && a.status === col);
-              const colWidth = anyExpanded
-                ? (isThisColExpanded ? expandedWidth : collapsedWidth)
-                : normalWidth;
+              const colWidth = anyExpanded ? (isThisColExpanded ? expandedWidth : collapsedWidth) : normalWidth;
               return (
-                <KanbanColumn
-                  key={col} status={col}
+                <KanbanColumn key={col} status={col}
                   apps={applications.filter(a => a.status === col)}
-                  expandedCardId={expandedCardId}
-                  onExpand={setExpandedCardId}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                  onInterview={setInterviewApp}
-                  onGenerateResume={setResumeApp}
-                  onNotesChange={handleNotesChange}
-                  activeId={activeId}
-                  colWidth={colWidth}
-                />
+                  expandedCardId={expandedCardId} onExpand={setExpandedCardId}
+                  onStatusChange={handleStatusChange} onDelete={handleDelete}
+                  onInterview={setInterviewApp} onGenerateResume={setResumeApp}
+                  onNotesChange={handleNotesChange} activeId={activeId} colWidth={colWidth} />
               );
             })}
           </div>
@@ -1344,4 +1176,3 @@ export default function JobTracker({ onBack }: JobTrackerProps) {
     </div>
   );
 }
-

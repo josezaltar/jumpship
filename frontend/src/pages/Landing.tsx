@@ -5,6 +5,7 @@ import {
   Map, Cpu, GitBranch, Mail, Rocket, BookOpen, MessageCircle, Settings2,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageToggle from '../components/LanguageToggle';
 
 const LINKS = {
   portfolio: 'https://awi-24.github.io',
@@ -109,7 +110,7 @@ const WHATS_NEXT: { Icon: typeof Map; title: string; desc: string; status: Roadm
   {
     Icon: Map,
     title: 'Deeper Brazilian & regional aggregation',
-    desc: 'Expand first-class sources beyond today’s JobSpy + registry mix — more local boards and better deduplication as data quality improves.',
+    desc: 'Expand first-class sources beyond today\'s JobSpy + registry mix — more local boards and better deduplication as data quality improves.',
     status: 'progress',
   },
   {
@@ -171,24 +172,21 @@ function statusBadgeClass(s: RoadmapStatus): string {
   return 'roadmap-badge roadmap-badge--planned';
 }
 
-// ── Floating icons (landing only) ────────────────────────────────────────────
-
 const FLOAT_ICONS = [
-  { Icon: Brain,    x: '8%',  y: '18%', delay: 0,    size: 20, opacity: 0.1  },
-  { Icon: Search,   x: '88%', y: '12%', delay: 1.2,  size: 16, opacity: 0.08 },
-  { Icon: FileText, x: '4%',  y: '60%', delay: 2.1,  size: 18, opacity: 0.08 },
-  { Icon: Cpu,      x: '92%', y: '55%', delay: 0.7,  size: 22, opacity: 0.09 },
-  { Icon: Zap,      x: '50%', y: '8%',  delay: 1.8,  size: 14, opacity: 0.07 },
-  { Icon: Globe,    x: '78%', y: '82%', delay: 0.4,  size: 18, opacity: 0.08 },
-  { Icon: Database, x: '15%', y: '88%', delay: 1.5,  size: 16, opacity: 0.07 },
-  { Icon: BarChart3,x: '65%', y: '92%', delay: 2.6,  size: 14, opacity: 0.06 },
+  { Icon: Brain,     x: '8%',  y: '18%', delay: 0,   size: 20, opacity: 0.1  },
+  { Icon: Search,    x: '88%', y: '12%', delay: 1.2, size: 16, opacity: 0.08 },
+  { Icon: FileText,  x: '4%',  y: '60%', delay: 2.1, size: 18, opacity: 0.08 },
+  { Icon: Cpu,       x: '92%', y: '55%', delay: 0.7, size: 22, opacity: 0.09 },
+  { Icon: Zap,       x: '50%', y: '8%',  delay: 1.8, size: 14, opacity: 0.07 },
+  { Icon: Globe,     x: '78%', y: '82%', delay: 0.4, size: 18, opacity: 0.08 },
+  { Icon: Database,  x: '15%', y: '88%', delay: 1.5, size: 16, opacity: 0.07 },
+  { Icon: BarChart3, x: '65%', y: '92%', delay: 2.6, size: 14, opacity: 0.06 },
 ];
 
 export default function Landing({ onEnter }: LandingProps) {
   return (
     <div className="landing">
 
-      {/* Floating decorative icons (landing only) */}
       <div className="floating-icons" aria-hidden>
         {FLOAT_ICONS.map(({ Icon, x, y, delay, size, opacity }, i) => (
           <div key={i} className="floating-icon" style={{ left: x, top: y, animationDelay: `${delay}s`, opacity }}>
@@ -212,6 +210,7 @@ export default function Landing({ onEnter }: LandingProps) {
         </ul>
         <div className="nav-actions">
           <ThemeToggle compact />
+          <LanguageToggle compact />
           <a href={LINKS.jumpshipRepo} target="_blank" rel="noopener noreferrer" className="btn btn-secondary nav-github">
             GitHub
           </a>
@@ -221,7 +220,7 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </nav>
 
-      {/* ── HERO: full viewport, logo only ── */}
+      {/* ── HERO ── */}
       <section className="hero">
         <motion.div
           className="hero-logo-full"
@@ -257,21 +256,13 @@ export default function Landing({ onEnter }: LandingProps) {
         </motion.div>
       </section>
 
-      {/* ── PIPELINE: titles RIGHT ── */}
-      <motion.section
-        className="landing-section landing-section--how"
-        id="pipeline"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── PIPELINE ── */}
+      <motion.section className="landing-section landing-section--how" id="pipeline"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-section-inner section-align-right">
           <div className="section-label">How it works</div>
-          <h2 className="section-title">
-            Four steps.<br />
-            <span style={{ color: 'var(--gold)' }}>Zero friction.</span>
-          </h2>
-          <p className="section-sub">
-            From résumé upload to ranked listings and tailored exports: one clean pipeline.
-          </p>
+          <h2 className="section-title">Four steps.<br /><span style={{ color: 'var(--gold)' }}>Zero friction.</span></h2>
+          <p className="section-sub">From résumé upload to ranked listings and tailored exports: one clean pipeline.</p>
           <motion.div className="how-grid" variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}>
             {PIPELINE_STEPS.map((step) => (
               <motion.div key={step.num} className="how-card" variants={staggerItem}>
@@ -287,25 +278,15 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </motion.section>
 
-      {/* ── FEATURES: titles LEFT ── */}
-      <motion.section
-        className="landing-section landing-section--alt"
-        id="features"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── FEATURES ── */}
+      <motion.section className="landing-section landing-section--alt" id="features"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-section-inner section-align-left">
           <div className="section-label">Capabilities</div>
-          <h2 className="section-title">
-            Everything ships<br />
-            <span style={{ color: 'var(--gold)' }}>ready to use.</span>
-          </h2>
-          <p className="section-sub">
-            Parsing, scoring, tracking, and company intel, designed to work together or be extended independently.
-          </p>
-          <motion.div
-            className="features-grid features-grid--centered"
-            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}
-          >
+          <h2 className="section-title">Everything ships<br /><span style={{ color: 'var(--gold)' }}>ready to use.</span></h2>
+          <p className="section-sub">Parsing, scoring, tracking, and company intel, designed to work together or be extended independently.</p>
+          <motion.div className="features-grid features-grid--centered"
+            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}>
             {FEATURES.map((f) => (
               <motion.div key={f.name} className="feature-card" variants={staggerItem}>
                 <div className="feature-icon"><f.Icon size={20} strokeWidth={1.5} /></div>
@@ -317,25 +298,15 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </motion.section>
 
-      {/* ── ARCHITECTURE: centered ── */}
-      <motion.section
-        className="landing-section landing-section--arch"
-        id="architecture"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── ARCHITECTURE ── */}
+      <motion.section className="landing-section landing-section--arch" id="architecture"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-section-inner section-align-center">
           <div className="section-label">System architecture</div>
-          <h2 className="section-title">
-            The full stack,<br />
-            <span style={{ color: 'var(--gold)' }}>end to end.</span>
-          </h2>
-          <p className="section-sub">
-            Résumé becomes a local profile. Job boards feed a unified pipeline. The LLM scores each role against you, then helps you export materials tuned to that listing.
-          </p>
-          <motion.div
-            className="arch-diagram arch-diagram--grid"
-            variants={fadeUp} initial="hidden" whileInView="visible" viewport={VIEWPORT}
-          >
+          <h2 className="section-title">The full stack,<br /><span style={{ color: 'var(--gold)' }}>end to end.</span></h2>
+          <p className="section-sub">Résumé becomes a local profile. Job boards feed a unified pipeline. The LLM scores each role against you, then helps you export materials tuned to that listing.</p>
+          <motion.div className="arch-diagram arch-diagram--grid"
+            variants={fadeUp} initial="hidden" whileInView="visible" viewport={VIEWPORT}>
             <div className="arch-node arch-diagram-grid__node" style={{ gridColumn: 1, gridRow: 1 }}>
               <div className="arch-node-icon"><FileText size={22} strokeWidth={1.5} /></div>
               <div className="arch-node-label">Résumé</div>
@@ -377,25 +348,15 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </motion.section>
 
-      {/* ── LOCAL LLM: titles LEFT ── */}
-      <motion.section
-        className="landing-section landing-section--alt"
-        id="local-llm"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── LOCAL LLM ── */}
+      <motion.section className="landing-section landing-section--alt" id="local-llm"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-section-inner section-align-left">
           <div className="section-label">Configuration</div>
-          <h2 className="section-title">
-            Local models,<br />
-            <span style={{ color: 'var(--gold)' }}>first-class.</span>
-          </h2>
-          <p className="section-sub">
-            JumpShip 1.0 defaults to Ollama; LM Studio works out of the box with the same UI. Cloud providers are optional — flip them on only when you want them.
-          </p>
-          <motion.div
-            className="how-grid how-grid--setup"
-            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}
-          >
+          <h2 className="section-title">Local models,<br /><span style={{ color: 'var(--gold)' }}>first-class.</span></h2>
+          <p className="section-sub">JumpShip 1.0 defaults to Ollama; LM Studio works out of the box with the same UI. Cloud providers are optional — flip them on only when you want them.</p>
+          <motion.div className="how-grid how-grid--setup"
+            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}>
             {LOCAL_LLM_STEPS.map((row) => (
               <motion.div key={row.num} className="how-card how-card--setup" variants={staggerItem}>
                 <div className="how-card-top">
@@ -413,25 +374,15 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </motion.section>
 
-      {/* ── WHAT'S NEXT: titles RIGHT ── */}
-      <motion.section
-        className="landing-section landing-section--alt"
-        id="whats-next"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── WHAT'S NEXT ── */}
+      <motion.section className="landing-section landing-section--alt" id="whats-next"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-section-inner section-align-right">
           <div className="section-label">Product direction</div>
-          <h2 className="section-title">
-            Shipped today.<br />
-            <span style={{ color: 'var(--gold)' }}>Clear next bets.</span>
-          </h2>
-          <p className="section-sub">
-            1.0 is the consolidation release: search stack, LLM scoring, tailored PDFs, tracker, and interview prep. What follows is depth — more regional coverage, richer profiles, and optional inbox workflows.
-          </p>
-          <motion.div
-            className="roadmap-grid"
-            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}
-          >
+          <h2 className="section-title">Shipped today.<br /><span style={{ color: 'var(--gold)' }}>Clear next bets.</span></h2>
+          <p className="section-sub">1.0 is the consolidation release: search stack, LLM scoring, tailored PDFs, tracker, and interview prep. What follows is depth — more regional coverage, richer profiles, and optional inbox workflows.</p>
+          <motion.div className="roadmap-grid"
+            variants={staggerParent} initial="hidden" whileInView="visible" viewport={VIEWPORT}>
             {WHATS_NEXT.map((item) => (
               <motion.div key={item.title} className="roadmap-card" variants={staggerItem}>
                 <div className="roadmap-card-header">
@@ -446,11 +397,9 @@ export default function Landing({ onEnter }: LandingProps) {
         </div>
       </motion.section>
 
-      {/* ── CTA: centered ── */}
-      <motion.section
-        className="landing-section landing-section--cta"
-        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}
-      >
+      {/* ── CTA ── */}
+      <motion.section className="landing-section landing-section--cta"
+        initial="hidden" whileInView="visible" viewport={VIEWPORT} variants={fadeUp}>
         <div className="landing-cta-box">
           <div className="section-label" style={{ margin: '0 0 16px' }}>Ready?</div>
           <h2 className="section-title" style={{ fontSize: 'clamp(28px, 4vw, 52px)', margin: '0 0 16px' }}>

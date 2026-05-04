@@ -3,6 +3,7 @@ import { Settings2, X, Check, Microscope, Zap, Rocket, FileText } from 'lucide-r
 import CustomSelect from './CustomSelect';
 import type { Settings } from '../hooks/useSettings';
 import type { LLMProvider } from '../types';
+import { useTranslation } from '../i18n/useTranslation';
 
 const PROVIDER_MODELS: Record<LLMProvider, string[]> = {
   ollama:      [],
@@ -21,17 +22,17 @@ const PROVIDER_MODELS: Record<LLMProvider, string[]> = {
 const LOCAL_PROVIDERS: LLMProvider[] = ['ollama', 'lmstudio'];
 
 const PROVIDER_OPTIONS = [
-  { value: 'ollama',      label: 'Ollama (local)',          group: 'Local' },
-  { value: 'lmstudio',   label: 'LM Studio (local)',       group: 'Local' },
-  { value: 'openai',     label: 'OpenAI',                  group: 'Cloud API' },
-  { value: 'anthropic',  label: 'Anthropic (Claude)',      group: 'Cloud API' },
-  { value: 'groq',       label: 'Groq (fast free tier)',   group: 'Cloud API' },
-  { value: 'gemini',     label: 'Google Gemini',           group: 'Cloud API' },
-  { value: 'mistral',    label: 'Mistral AI',              group: 'Cloud API' },
-  { value: 'deepseek',   label: 'DeepSeek',                group: 'Cloud API' },
-  { value: 'huggingface',label: 'Hugging Face',            group: 'Cloud API' },
-  { value: 'openrouter', label: 'OpenRouter (free models)',group: 'Cloud API' },
-  { value: 'cohere',     label: 'Cohere',                  group: 'Cloud API' },
+  { value: 'ollama',       label: 'Ollama (local)',           group: 'Local' },
+  { value: 'lmstudio',    label: 'LM Studio (local)',        group: 'Local' },
+  { value: 'openai',      label: 'OpenAI',                   group: 'Cloud API' },
+  { value: 'anthropic',   label: 'Anthropic (Claude)',       group: 'Cloud API' },
+  { value: 'groq',        label: 'Groq (fast free tier)',    group: 'Cloud API' },
+  { value: 'gemini',      label: 'Google Gemini',            group: 'Cloud API' },
+  { value: 'mistral',     label: 'Mistral AI',               group: 'Cloud API' },
+  { value: 'deepseek',    label: 'DeepSeek',                 group: 'Cloud API' },
+  { value: 'huggingface', label: 'Hugging Face',             group: 'Cloud API' },
+  { value: 'openrouter',  label: 'OpenRouter (free models)', group: 'Cloud API' },
+  { value: 'cohere',      label: 'Cohere',                   group: 'Cloud API' },
 ];
 
 const API_KEY_FIELD: Partial<Record<LLMProvider, keyof Settings>> = {
@@ -66,6 +67,7 @@ interface Props {
 }
 
 export default function SettingsModal({ open, initial, onSave, onClose }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Settings>(initial);
   const [status, setStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
@@ -137,9 +139,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
   const isCloud = !isLocal;
   const apiKeyField = API_KEY_FIELD[draft.llmProvider];
   const apiKey = apiKeyField ? (draft[apiKeyField] as string) : '';
-  const setApiKey = (val: string) => {
-    if (apiKeyField) set(apiKeyField, val as never);
-  };
+  const setApiKey = (val: string) => { if (apiKeyField) set(apiKeyField, val as never); };
 
   const testConnection = async () => {
     setStatus('checking');
@@ -177,7 +177,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
 
         <div className="modal-header">
           <div className="modal-title">
-            <Settings2 size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />Settings
+            <Settings2 size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />{t('settings')}
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
@@ -187,7 +187,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
 
             {/* Provider */}
             <div className="settings-row">
-              <label className="settings-label">LLM Provider</label>
+              <label className="settings-label">{t('llmProvider')}</label>
               <CustomSelect
                 value={draft.llmProvider}
                 onChange={v => handleProviderChange(v as LLMProvider)}
@@ -198,7 +198,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
             {/* Local base URL */}
             {isLocal && (
               <div className="settings-row">
-                <label className="settings-label">Base URL</label>
+                <label className="settings-label">{t('baseUrl')}</label>
                 <input
                   className="config-input"
                   value={draft.ollamaUrl}
@@ -207,8 +207,8 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                 />
                 <div className="settings-hint">
                   {draft.llmProvider === 'lmstudio'
-                    ? 'LM Studio default: http://localhost:1234/v1/. Start "Local Server" in LM Studio first.'
-                    : 'Leave blank to use backend default. Linux: try http://127.0.0.1:11434 if localhost fails.'}
+                    ? 'LM Studio padrão: http://localhost:1234/v1/. Inicie o "Local Server" no LM Studio primeiro.'
+                    : 'Deixe em branco para usar o padrão do backend. Linux: tente http://127.0.0.1:11434 se localhost falhar.'}
                 </div>
               </div>
             )}
@@ -216,20 +216,20 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
             {/* Model */}
             <div className="settings-row">
               <label className="settings-label">
-                Model
+                {t('model')}
                 {loadingModels && (
                   <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                    <span className="spinner" style={{ width: 10, height: 10, display: 'inline-block', verticalAlign: 'middle' }} /> fetching…
+                    <span className="spinner" style={{ width: 10, height: 10, display: 'inline-block', verticalAlign: 'middle' }} /> {t('loading')}
                   </span>
                 )}
                 {!loadingModels && liveModels.length > 0 && (
                   <span style={{ marginLeft: 8, fontSize: 11, color: '#4ade80' }}>
-                    {liveModels.length} available
+                    {liveModels.length} disponíveis
                   </span>
                 )}
                 {isLocalUnreachable && (
                   <span style={{ marginLeft: 8, fontSize: 11, color: '#f87171' }}>
-                    unreachable; type manually
+                    inacessível; digite manualmente
                   </span>
                 )}
               </label>
@@ -244,17 +244,17 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                   className="config-input"
                   value={draft.llmModel}
                   onChange={e => set('llmModel', e.target.value)}
-                  placeholder={draft.llmProvider === 'lmstudio' ? 'loaded model name' : 'e.g. qwen2.5:7b-instruct'}
+                  placeholder={draft.llmProvider === 'lmstudio' ? 'nome do modelo carregado' : 'ex. qwen2.5:7b-instruct'}
                   autoComplete="off"
                 />
               )}
             </div>
 
-            {/* API Key — cloud providers */}
+            {/* API Key */}
             {isCloud && apiKeyField && (
               <div className="settings-row">
                 <label className="settings-label">
-                  API Key <span className="settings-required">required</span>
+                  {t('apiKey')} <span className="settings-required">obrigatório</span>
                 </label>
                 <input
                   className="config-input"
@@ -265,7 +265,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                   autoComplete="off"
                 />
                 <div className="settings-hint">
-                  Stored only in your browser, and sent only to the provider's API via the backend.
+                  Armazenada apenas no seu navegador e enviada somente à API do provedor via backend.
                 </div>
               </div>
             )}
@@ -273,13 +273,15 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
             {/* Per-step model overrides */}
             {hasModelList && (
               <div className="settings-row" style={{ marginTop: 4 }}>
-                <label className="settings-label" style={{ marginBottom: 8 }}>Per-step model overrides</label>
+                <label className="settings-label" style={{ marginBottom: 8 }}>
+                  Modelos por etapa
+                </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {(
                     [
-                      { key: 'evaluatorLlmModel', label: 'Evaluator' },
-                      { key: 'resumeGenLlmModel', label: 'Resume Gen' },
-                      { key: 'interviewLlmModel', label: 'Interview' },
+                      { key: 'evaluatorLlmModel', label: 'Avaliador' },
+                      { key: 'resumeGenLlmModel',  label: 'Geração de CV' },
+                      { key: 'interviewLlmModel',  label: 'Entrevista' },
                     ] as const
                   ).map(({ key, label }) => (
                     <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -289,7 +291,7 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                           value={draft[key]}
                           onChange={v => set(key, v)}
                           options={[
-                            { value: '', label: 'Same as above' },
+                            { value: '', label: 'Mesmo modelo acima' },
                             ...modelOptions.map(m => ({ value: m, label: m })),
                           ]}
                         />
@@ -297,13 +299,13 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                     </div>
                   ))}
                 </div>
-                <div className="settings-hint">Leave blank to use the model selected above.</div>
+                <div className="settings-hint">Deixe em branco para usar o modelo selecionado acima.</div>
               </div>
             )}
 
             {/* Assessment Speed */}
             <div className="settings-row" style={{ marginTop: 8 }}>
-              <label className="settings-label">Assessment Speed</label>
+              <label className="settings-label">{t('assessmentSpeed')}</label>
               <div className="speed-mode-picker">
                 {(['careful', 'balanced', 'turbo'] as const).map(mode => (
                   <button
@@ -313,11 +315,15 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
                     onClick={() => set('assessmentSpeed', mode)}
                   >
                     <span className="speed-mode-icon">
-                      {mode === 'careful' ? <Microscope size={16} strokeWidth={1.5} /> : mode === 'balanced' ? <Zap size={16} strokeWidth={1.5} /> : <Rocket size={16} strokeWidth={1.5} />}
+                      {mode === 'careful'  ? <Microscope size={16} strokeWidth={1.5} /> :
+                       mode === 'balanced' ? <Zap size={16} strokeWidth={1.5} /> :
+                                            <Rocket size={16} strokeWidth={1.5} />}
                     </span>
-                    <span className="speed-mode-label">{mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
+                    <span className="speed-mode-label">
+                      {mode === 'careful' ? 'Cuidadoso' : mode === 'balanced' ? 'Balanceado' : 'Turbo'}
+                    </span>
                     <span className="speed-mode-desc">
-                      {mode === 'careful' ? '1 at a time' : mode === 'balanced' ? '3 parallel' : '6 parallel'}
+                      {mode === 'careful' ? '1 por vez' : mode === 'balanced' ? '3 paralelos' : '6 paralelos'}
                     </span>
                   </button>
                 ))}
@@ -328,21 +334,18 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
             <div className="settings-row" style={{ marginTop: 8 }}>
               <label className="settings-label">
                 <FileText size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />
-                Resume Gen Threshold
+                Limite para Gerar CV
                 <span style={{ marginLeft: 8, fontWeight: 700, color: 'var(--gold)' }}>{draft.resumeGenThreshold}%</span>
               </label>
               <input
-                type="range"
-                min={50}
-                max={95}
-                step={5}
+                type="range" min={50} max={95} step={5}
                 value={draft.resumeGenThreshold}
                 onChange={e => set('resumeGenThreshold', Number(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--gold)' }}
               />
               <div className="settings-hint">
-                Jobs scoring ≥ {draft.resumeGenThreshold}% will show a highlighted "Download Resume" button.
-                Set higher to be more selective.
+                Vagas com score ≥ {draft.resumeGenThreshold}% exibirão o botão "Baixar Currículo" em destaque.
+                Aumente para ser mais seletivo.
               </div>
             </div>
 
@@ -351,19 +354,15 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
               <div className="settings-row settings-row--inline">
                 <button className="test-btn" onClick={testConnection} disabled={status === 'checking'}>
                   {status === 'checking'
-                    ? <><div className="spinner" style={{ width: 12, height: 12 }} /> Testing…</>
-                    : 'Test Connection'}
+                    ? <><div className="spinner" style={{ width: 12, height: 12 }} /> Testando…</>
+                    : t('testConnection')}
                 </button>
-                {status === 'ok'    && <span className="test-result ok"><Check size={12} style={{ verticalAlign: 'middle', marginRight: 3 }} />Connected</span>}
-                {status === 'error' && <span className="test-result error"><X size={12} style={{ verticalAlign: 'middle', marginRight: 3 }} />Failed</span>}
+                {status === 'ok'    && <span className="test-result ok"><Check size={12} style={{ verticalAlign: 'middle', marginRight: 3 }} />{t('connected')}</span>}
+                {status === 'error' && <span className="test-result error"><X size={12} style={{ verticalAlign: 'middle', marginRight: 3 }} />Falhou</span>}
               </div>
               {testMessage && (
                 <div style={{
-                  marginTop: 8,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  lineHeight: 1.5,
+                  marginTop: 8, padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.5,
                   background: status === 'ok' ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.06)',
                   border: `1px solid ${status === 'ok' ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}`,
                   color: status === 'ok' ? '#4ade80' : '#f87171',
@@ -378,14 +377,11 @@ export default function SettingsModal({ open, initial, onSave, onClose }: Props)
 
         <div className="modal-footer">
           <button className="btn-secondary" style={{ padding: '10px 24px', fontSize: 14 }} onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </button>
-          <button
-            className="btn-primary"
-            style={{ padding: '10px 24px', fontSize: 14 }}
-            onClick={() => { onSave(draft); onClose(); }}
-          >
-            Save Settings
+          <button className="btn-primary" style={{ padding: '10px 24px', fontSize: 14 }}
+            onClick={() => { onSave(draft); onClose(); }}>
+            {t('save')} Settings
           </button>
         </div>
 

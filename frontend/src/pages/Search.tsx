@@ -16,6 +16,8 @@ import { useJobSearch } from '../hooks/useJobs';
 import { useSettings } from '../hooks/useSettings';
 import { useResumeCache } from '../hooks/useResumeCache';
 import type { ResumeProfile, JobResult, JobAssessment, SortOption, ProfileResponse } from '../types';
+import { useTranslation } from '../i18n/useTranslation';
+import LanguageToggle from '../components/LanguageToggle';
 
 interface SearchProps {
   onBack: () => void;
@@ -32,7 +34,6 @@ const JUMPSHIP_SITE_LABELS: Record<string, string> = {
 };
 const PAGE_SIZE = 20;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 function parseSalary(s: string): number {
   if (!s) return -1;
   const m = s.match(/[\d,]+/);
@@ -45,7 +46,6 @@ function parseDate(s: string): number {
   return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
-// ── Search History (localStorage) ────────────────────────────────────────────
 interface SearchHistoryEntry {
   keywords: string[];
   location: string;
@@ -72,7 +72,6 @@ function saveHistory(entry: SearchHistoryEntry) {
   } catch { /* ignore */ }
 }
 
-// ── Export helpers ────────────────────────────────────────────────────────────
 function exportCSV(jobs: JobResult[], assessments: Record<string, JobAssessment>) {
   const header = 'Title,Company,Location,Site,Salary,Posted,Score,Summary,URL\n';
   const rows = jobs.map(j => {
@@ -109,9 +108,9 @@ function exportJSON(jobs: JobResult[], assessments: Record<string, JobAssessment
   URL.revokeObjectURL(url);
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
 export default function Search({ onBack, onNavigate }: SearchProps) {
   const { settings, saveSettings } = useSettings();
+  const { t } = useTranslation();
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
@@ -122,14 +121,12 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
   const [llmStatus, setLlmStatus] = useState<'green' | 'yellow' | 'red'>('yellow');
   const [profileFillCount, setProfileFillCount] = useState(0);
 
-  // Resume — with localStorage persistence
   const resumeMutation = useResumeParse();
   const { cache: resumeCache, saveResume, clearResume } = useResumeCache();
   const [resumeProfile, setResumeProfile] = useState<ResumeProfile | null>(resumeCache?.profile ?? null);
   const [resumeFileName, setResumeFileName] = useState(resumeCache?.fileName ?? '');
   const [resumeError, setResumeError] = useState<string | null>(null);
 
-  // Search filters — pre-fill from cached resume if available
   const [keywords, setKeywords] = useState<string[]>(resumeCache?.keywords ?? []);
   const [location, setLocation] = useState(settings.defaultLocation);
   const [jobType, setJobType] = useState('all');
@@ -139,21 +136,12 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     settings.defaultSites?.length ? settings.defaultSites : ['linkedin', 'indeed', 'glassdoor']
   );
   const [resultsWanted, setResultsWanted] = useState(settings.resultsWanted ?? 20);
-
-  // Pagination
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  // Search history
   const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>(loadHistory);
-
-  // Saved-to-tracker tracking (optimistic UI, keyed by job URL)
   const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set());
-
   const [showHidden, setShowHidden] = useState(false);
-
-  // Keyword suggestions & translations
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [translations, setTranslations] = useState<string[]>([]);
+  const [kwTranslations, setKwTranslations] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [loadingTranslations, setLoadingTranslations] = useState(false);
 
@@ -162,14 +150,12 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       prev.includes(site) ? prev.filter(s => s !== site) : [...prev, site]
     );
 
-  // Assessments — owned by parent for sorting + auto-assess
   const [assessments, setAssessments] = useState<Record<string, JobAssessment>>({});
   const [assessingIds, setAssessingIds] = useState<Set<string>>(new Set());
 
   const jobSearch = useJobSearch();
   const jobs: JobResult[] = jobSearch.data || [];
 
-  // Poll LLM health
   useEffect(() => {
     const check = async () => {
       try {
@@ -185,7 +171,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     return () => clearInterval(id);
   }, [settings.llmProvider]);
 
-  // ── Resume upload ──────────────────────────────────────────────────────────
   const handleResumeUpload = useCallback(async (file: File) => {
     setResumeError(null);
     const s = settingsRef.current;
@@ -220,12 +205,10 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         .forEach(k => kws.push(k));
       setKeywords(kws);
     }
-    // Persist so next session auto-restores without re-upload
     saveResume(profile, kws, file.name);
     if (!location && s.defaultLocation) setLocation(s.defaultLocation);
     else if (!location) setLocation('Remote');
 
-    // Auto-fill profile fields (only empty ones)
     const hasExtracted = profile.name || profile.email || profile.phone ||
       profile.location_city || profile.experience_years > 0;
     if (hasExtracted) {
@@ -235,18 +218,16 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
             const r = await fetch('/api/profile');
             if (!r.ok) return null;
             return (await r.json()) as ProfileResponse;
-          } catch {
-            return null;
-          }
+          } catch { return null; }
         };
         const current: ProfileResponse = (await fetchProfile()) ?? {};
         const merged: Record<string, unknown> = { ...current };
         let filled = 0;
-        if (!current.full_name && profile.name)                   { merged.full_name = profile.name; filled++; }
-        if (!current.email && profile.email)                      { merged.email = profile.email; filled++; }
-        if (!current.phone && profile.phone)                      { merged.phone = profile.phone; filled++; }
-        if (!current.location_city && profile.location_city)      { merged.location_city = profile.location_city; filled++; }
-        if (!current.location_country && profile.location_country){ merged.location_country = profile.location_country; filled++; }
+        if (!current.full_name && profile.name)                    { merged.full_name = profile.name; filled++; }
+        if (!current.email && profile.email)                       { merged.email = profile.email; filled++; }
+        if (!current.phone && profile.phone)                       { merged.phone = profile.phone; filled++; }
+        if (!current.location_city && profile.location_city)       { merged.location_city = profile.location_city; filled++; }
+        if (!current.location_country && profile.location_country) { merged.location_country = profile.location_country; filled++; }
         if (!current.years_experience && profile.experience_years > 0) { merged.years_experience = profile.experience_years; filled++; }
         if (filled > 0) {
           await fetch('/api/profile', {
@@ -257,7 +238,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           setProfileFillCount(filled);
           setTimeout(() => setProfileFillCount(0), 5000);
         }
-      } catch { /* non-critical, ignore */ }
+      } catch { /* non-critical */ }
     }
   }, [resumeMutation, location, saveResume]);
 
@@ -272,7 +253,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
 
   const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio', 'openclaw']);
 
-  // ── Build LLM body fields ──────────────────────────────────────────────────
   const getLlmFields = useCallback((featureModel?: string) => {
     const s = settingsRef.current;
     const keyMap: Record<string, string> = {
@@ -288,14 +268,11 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     };
   }, []);
 
-  // ── Auto-assess all jobs ──────────────────────────────────────────────────
   const assessSingle = useCallback(async (job: JobResult, profile: ResumeProfile) => {
     const body = { job, resume_profile: profile, ...getLlmFields(settingsRef.current.evaluatorLlmModel) };
     setAssessingIds(prev => new Set(prev).add(job.id));
-
     const MAX_RETRIES = 2;
     let lastData: JobAssessment | null = null;
-
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const res = await fetch('/api/jobs/assess', {
@@ -311,43 +288,28 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         }
         lastData = data;
         break;
-      } catch {
-        break;
-      }
+      } catch { break; }
     }
-
     const fallback: JobAssessment = {
       match_score: 0,
       summary: 'Assessment could not be completed for this listing.',
-      strong_points: [],
-      gaps: [],
-      career_suggestions: [],
-      is_relevant: true,
+      strong_points: [], gaps: [], career_suggestions: [], is_relevant: true,
     };
     setAssessments(prev => ({ ...prev, [job.id]: lastData ?? fallback }));
     setAssessingIds(prev => { const s = new Set(prev); s.delete(job.id); return s; });
   }, [getLlmFields]);
 
-  // ── Batch assess (cloud providers — parallel, one round-trip) ─────────────
   const assessBatch = useCallback(async (jobList: JobResult[], profile: ResumeProfile) => {
-    if (!jobList.length) {
-      setAssessingIds(new Set());
-      return;
-    }
+    if (!jobList.length) { setAssessingIds(new Set()); return; }
     setAssessingIds(new Set(jobList.map(j => j.id)));
     const batchFallback: JobAssessment = {
       match_score: 0,
       summary: 'Assessment could not be completed for this listing.',
-      strong_points: [],
-      gaps: [],
-      career_suggestions: [],
-      is_relevant: true,
+      strong_points: [], gaps: [], career_suggestions: [], is_relevant: true,
     };
     try {
       const body = {
-        jobs: jobList,
-        resume_profile: profile,
-        include_company_research: false,
+        jobs: jobList, resume_profile: profile, include_company_research: false,
         ...getLlmFields(settingsRef.current.evaluatorLlmModel),
       };
       const res = await fetch('/api/jobs/assess-batch', {
@@ -370,9 +332,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           if (item.assessment) next[item.job_id] = item.assessment;
           else if (item.job_id) next[item.job_id] = batchFallback;
         }
-        for (const j of jobList) {
-          if (!next[j.id]) next[j.id] = batchFallback;
-        }
+        for (const j of jobList) { if (!next[j.id]) next[j.id] = batchFallback; }
         return next;
       });
     } catch {
@@ -381,32 +341,21 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         for (const j of jobList) next[j.id] = batchFallback;
         return next;
       });
-    }
-    finally {
+    } finally {
       setAssessingIds(new Set());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getLlmFields]);
 
-  // Trigger auto-assessment whenever jobs load and a resume exists
   const jobIds = jobs.map(j => j.id).join(',');
   useEffect(() => {
     if (!resumeProfile || !jobs.length) return;
     setAssessments({});
     const pending = [...jobs];
-    // Mark every job as in-flight immediately so the search loader stays up without a gap
     setAssessingIds(new Set(pending.map(j => j.id)));
-
     const s = settingsRef.current;
     const isCloud = !LOCAL_PROVIDERS.has(s.llmProvider || 'ollama');
-
-    if (isCloud) {
-      // Cloud: fire all in parallel via batch endpoint
-      assessBatch(jobs, resumeProfile);
-      return;
-    }
-
-    // Local: sequential batches with backend semaphore preventing GPU contention
+    if (isCloud) { assessBatch(jobs, resumeProfile); return; }
     let cancelled = false;
     (async () => {
       for (let i = 0; i < pending.length; i += ASSESS_CONCURRENCY) {
@@ -425,17 +374,14 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     assessSingle(job, resumeProfile);
   }, [resumeProfile, assessSingle]);
 
-  // ── Search ─────────────────────────────────────────────────────────────────
   const handleSearch = () => {
     const s = settingsRef.current;
     const apiKey =
       s.llmProvider === 'openai'    ? s.openaiKey :
       s.llmProvider === 'anthropic' ? s.anthropicKey :
       s.llmProvider === 'groq'      ? s.groqKey : '';
-
     jobSearch.mutate({
-      keywords,
-      location,
+      keywords, location,
       job_type: jobType === 'all' ? 'fulltime' : jobType,
       sites: activeSites.length > 0 ? activeSites : ['linkedin', 'indeed'],
       results_wanted: resultsWanted,
@@ -445,26 +391,16 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       llm_api_key:  apiKey     || undefined,
       llm_base_url: s.ollamaUrl || undefined,
     });
-
-    // Save to search history
-    const entry: SearchHistoryEntry = {
-      keywords: [...keywords],
-      location,
-      sites: [...activeSites],
-      timestamp: Date.now(),
-    };
+    const entry: SearchHistoryEntry = { keywords: [...keywords], location, sites: [...activeSites], timestamp: Date.now() };
     saveHistory(entry);
     setSearchHistory(loadHistory());
     setVisibleCount(PAGE_SIZE);
     setSuggestions([]);
-    setTranslations([]);
+    setKwTranslations([]);
   };
 
-
-  // ── Keywords ───────────────────────────────────────────────────────────────
   const removeKeyword = (kw: string) => setKeywords(k => k.filter(x => x !== kw));
   const addKeyword = (kw?: string) => {
-    // Normalize: lowercase + trim so "Python" and "python" are the same keyword
     const keyword = (kw || newKeyword).trim().toLowerCase();
     if (keyword && !keywords.some(k => k.toLowerCase() === keyword)) {
       setKeywords(k => [...k, keyword]);
@@ -472,7 +408,6 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     if (!kw) setNewKeyword('');
   };
 
-  // ── Keyword Suggestions (LLM) ─────────────────────────────────────────────
   const fetchSuggestions = async () => {
     if (keywords.length === 0) return;
     setLoadingSuggestions(true);
@@ -489,11 +424,10 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     setLoadingSuggestions(false);
   };
 
-  // ── Multi-language Translation ─────────────────────────────────────────────
   const fetchTranslations = async () => {
     if (keywords.length === 0) return;
     setLoadingTranslations(true);
-    setTranslations([]);
+    setKwTranslations([]);
     try {
       const res = await fetch('/api/jobs/translate-keywords', {
         method: 'POST',
@@ -501,12 +435,11 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         body: JSON.stringify({ keywords, target_language: 'pt', ...getLlmFields() }),
       });
       const data = await res.json();
-      setTranslations(data.translations || []);
+      setKwTranslations(data.translations || []);
     } catch { /* ignore */ }
     setLoadingTranslations(false);
   };
 
-  // ── Save to Tracker ────────────────────────────────────────────────────────
   const handleSaveToTracker = useCallback(async (job: JobResult) => {
     const key = job.url || job.id;
     if (savedUrls.has(key)) return;
@@ -516,34 +449,25 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          job_title: job.title,
-          company_name: job.company,
-          job_url: job.url,
-          site: job.site,
-          status: 'saved',
+          job_title: job.title, company_name: job.company, job_url: job.url,
+          site: job.site, status: 'saved',
           assessment_data: assessment ?? null,
           match_score: assessment?.match_score ?? null,
           job_description: job.description ?? null,
         }),
       });
       setSavedUrls(prev => new Set(prev).add(key));
-    } catch { /* silent — tracker page will show nothing changed */ }
+    } catch { /* silent */ }
   }, [assessments, savedUrls]);
 
-  // ── Restore search from history ────────────────────────────────────────────
   const restoreSearch = (entry: SearchHistoryEntry) => {
     setKeywords(entry.keywords);
     setLocation(entry.location);
     setActiveSites(entry.sites);
   };
 
-  // ── Sorting + relevance filter ──────────────────────────────────────────────
   const sortedJobs = useMemo(() => {
-    const visible = jobs.filter(j => {
-      const a = assessments[j.id];
-      return !a || a.is_relevant !== false;
-    });
-
+    const visible = jobs.filter(j => { const a = assessments[j.id]; return !a || a.is_relevant !== false; });
     return [...visible].sort((a, b) => {
       if (sortBy === 'match') {
         const sa = assessments[a.id]?.match_score ?? -1;
@@ -556,17 +480,10 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
     });
   }, [jobs, sortBy, assessments]);
 
-  // Paginated view
   const paginatedJobs = sortedJobs.slice(0, visibleCount);
   const hasMore = visibleCount < sortedJobs.length;
-
-  const filteredCount = useMemo(() =>
-    jobs.filter(j => assessments[j.id]?.is_relevant === false).length,
-  [jobs, assessments]);
-
-  const hiddenJobs = useMemo(() =>
-    jobs.filter(j => assessments[j.id]?.is_relevant === false),
-  [jobs, assessments]);
+  const filteredCount = useMemo(() => jobs.filter(j => assessments[j.id]?.is_relevant === false).length, [jobs, assessments]);
+  const hiddenJobs = useMemo(() => jobs.filter(j => assessments[j.id]?.is_relevant === false), [jobs, assessments]);
 
   const llmConfig = {
     provider: settings.llmProvider,
@@ -580,11 +497,9 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
 
   const assessedCount = Object.keys(assessments).length;
   const assessingCount = assessingIds.size;
-
   const totalJobCount = jobs.length;
   const awaitingAllAssessments =
-    Boolean(resumeProfile) &&
-    totalJobCount > 0 &&
+    Boolean(resumeProfile) && totalJobCount > 0 &&
     (assessingCount > 0 || assessedCount < totalJobCount);
   const searchPipelineBusy = jobSearch.isPending || awaitingAllAssessments;
 
@@ -603,7 +518,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           animation: 'fadeIn 0.2s ease',
         }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Profile auto-filled ({profileFillCount} field{profileFillCount !== 1 ? 's' : ''})
+          {t('profileAutoFilled')} ({profileFillCount} {profileFillCount !== 1 ? t('fields') : t('field')})
         </div>
       )}
 
@@ -623,15 +538,16 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button className="settings-trigger" onClick={() => onNavigate('tracker')} title="Job Tracker">
-            <Bookmark size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />Tracker
+          <button className="settings-trigger" onClick={() => onNavigate('tracker')} title={t('tracker')}>
+            <Bookmark size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />{t('tracker')}
           </button>
           <ThemeToggle compact />
-          <button className="settings-trigger" onClick={() => setProfileOpen(true)} title="Profile">
-            <User size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />Profile
+          <LanguageToggle compact />
+          <button className="settings-trigger" onClick={() => setProfileOpen(true)} title={t('profile')}>
+            <User size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />{t('profile')}
           </button>
-          <button className="settings-trigger" onClick={() => setSettingsOpen(true)} title="Settings">
-            <Settings2 size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />Settings
+          <button className="settings-trigger" onClick={() => setSettingsOpen(true)} title={t('settings')}>
+            <Settings2 size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />{t('settings')}
           </button>
         </div>
       </header>
@@ -639,14 +555,13 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
       <SettingsModal open={settingsOpen} initial={settings} onSave={saveSettings} onClose={() => setSettingsOpen(false)} />
       {profileOpen && <Profile onClose={() => setProfileOpen(false)} />}
 
-
       <div className="search-body">
         {/* ── SIDEBAR ── */}
         <aside className="sidebar">
 
           {/* Resume */}
           <div>
-            <div className="sidebar-section-title">Résumé</div>
+            <div className="sidebar-section-title">{t('resume')}</div>
             <ResumeUpload
               profile={resumeProfile}
               fileName={resumeFileName}
@@ -671,7 +586,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                 onMouseEnter={e => (e.currentTarget.style.borderColor = '#f87171')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
               >
-                <X size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Clear résumé
+                <X size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />{t('clearResume')}
               </button>
             )}
           </div>
@@ -682,45 +597,48 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               <span className={`status-dot ${llmStatus}`} />
               <span className="llm-status-text">
                 {['ollama', 'lmstudio', 'openclaw'].includes(settings.llmProvider)
-                  ? `${settings.llmProvider} · local`
-                  : `${settings.llmProvider} · cloud`}
+                  ? `${settings.llmProvider} · ${t('local')}`
+                  : `${settings.llmProvider} · ${t('cloud')}`}
               </span>
             </div>
             <div className="llm-status-model">{settings.llmModel}</div>
             {llmStatus === 'red' && (
-              <div className="llm-warning"><AlertTriangle size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />{settings.llmProvider} not reachable. Check Settings</div>
+              <div className="llm-warning">
+                <AlertTriangle size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                {settings.llmProvider} {t('notReachable')}
+              </div>
             )}
             {assessingCount > 0 && (
               <div style={{ marginTop: 8, fontSize: 11, color: 'var(--gold)' }}>
                 <div className="spinner" style={{ width: 8, height: 8, display: 'inline-block', verticalAlign: 'middle', marginRight: 5 }} />
-                Assessing {assessingCount} job{assessingCount > 1 ? 's' : ''}…
-                {assessedCount > 0 && ` (${assessedCount}/${jobs.length} done)`}
+                {t('assessing')} {assessingCount} {assessingCount > 1 ? t('jobs') : t('job')}…
+                {assessedCount > 0 && ` (${assessedCount}/${jobs.length} ${t('done')})`}
               </div>
             )}
             <button className="llm-settings-link" onClick={() => setSettingsOpen(true)}>
-              <Settings2 size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Change LLM or API keys →
+              <Settings2 size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />{t('changeLLM')}
             </button>
           </div>
 
           {/* Search Filters */}
           <div>
-            <div className="sidebar-section-title">Search Filters</div>
+            <div className="sidebar-section-title">{t('searchFilters')}</div>
 
             {/* Keywords */}
             <div className="filter-group">
-              <div className="filter-label">Keywords</div>
+              <div className="filter-label">{t('keywords')}</div>
               <div className="keyword-chips">
                 {keywords.map(k => {
                   const isLong = k.split(' ').length > 2 || k.length > 25;
                   return (
-                    <div key={k} className={`keyword-chip${isLong ? ' kw-warn' : ''}`} title={isLong ? 'Long phrases may return fewer results' : undefined}>
+                    <div key={k} className={`keyword-chip${isLong ? ' kw-warn' : ''}`} title={isLong ? t('longPhraseWarning') : undefined}>
                       {k}
                       <button onClick={() => removeKeyword(k)}>×</button>
                     </div>
                   );
                 })}
                 {keywords.length === 0 && (
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Auto-filled from résumé</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('autoFilledFromResume')}</span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
@@ -735,37 +653,26 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               </div>
               {newKeyword.split(' ').length > 2 && (
                 <div style={{ fontSize: 11, color: '#f5a623', marginTop: 4, lineHeight: 1.4 }}>
-                  <AlertTriangle size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />Use short keywords (e.g. python, react). Long phrases may return no results.
+                  <AlertTriangle size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />{t('longPhraseWarning')}
                 </div>
               )}
 
               {/* AI Keyword Tools */}
               {keywords.length > 0 && llmStatus === 'green' && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <button
-                    className="export-btn"
-                    style={{ flex: 1 }}
-                    onClick={fetchSuggestions}
-                    disabled={loadingSuggestions}
-                  >
+                  <button className="export-btn" style={{ flex: 1 }} onClick={fetchSuggestions} disabled={loadingSuggestions}>
                     {loadingSuggestions
-                      ? <><div className="spinner" style={{ width: 8, height: 8 }} /> Loading…</>
-                      : 'Suggest related'}
+                      ? <><div className="spinner" style={{ width: 8, height: 8 }} /> {t('loading')}</>
+                      : t('suggestRelated')}
                   </button>
-                  <button
-                    className="export-btn"
-                    style={{ flex: 1 }}
-                    onClick={fetchTranslations}
-                    disabled={loadingTranslations}
-                  >
+                  <button className="export-btn" style={{ flex: 1 }} onClick={fetchTranslations} disabled={loadingTranslations}>
                     {loadingTranslations
-                      ? <><div className="spinner" style={{ width: 8, height: 8 }} /> Loading…</>
-                      : <><Globe size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Translate PT</>}
+                      ? <><div className="spinner" style={{ width: 8, height: 8 }} /> {t('loading')}</>
+                      : <><Globe size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />{t('translatePT')}</>}
                   </button>
                 </div>
               )}
 
-              {/* Suggested keywords */}
               {suggestions.length > 0 && (
                 <div className="suggestion-chips">
                   {suggestions.map(s => (
@@ -774,49 +681,47 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                 </div>
               )}
 
-              {/* Translated keywords */}
-              {translations.length > 0 && (
+              {kwTranslations.length > 0 && (
                 <div className="translate-chips">
-                  {translations.map(t => (
-                    <button key={t} className="translate-chip" onClick={() => addKeyword(t)}>+ {t}</button>
+                  {kwTranslations.map(tr => (
+                    <button key={tr} className="translate-chip" onClick={() => addKeyword(tr)}>+ {tr}</button>
                   ))}
                 </div>
               )}
 
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                Tip: atomic keywords work best, e.g. <em>python</em>, <em>sql</em>, <em>figma</em>
+                {t('tipKeywords')} <em>python</em>, <em>sql</em>, <em>figma</em>
               </div>
             </div>
 
             {/* Location */}
             <div className="filter-group" style={{ marginTop: 14 }}>
-              <div className="filter-label">Location</div>
+              <div className="filter-label">{t('location')}</div>
               <LocationSelect value={location} onChange={setLocation} />
             </div>
 
             {/* Job Type */}
             <div className="filter-group" style={{ marginTop: 14 }}>
-              <div className="filter-label">Job Type</div>
+              <div className="filter-label">{t('jobType')}</div>
               <CustomSelect
                 value={jobType}
                 onChange={v => setJobType(v)}
                 options={[
-                  { value: 'all', label: 'All Types' },
-                  { value: 'fulltime', label: 'Full-time' },
-                  { value: 'parttime', label: 'Part-time' },
-                  { value: 'contract', label: 'Contract' },
+                  { value: 'all',      label: t('allTypes') },
+                  { value: 'fulltime', label: t('fullTime') },
+                  { value: 'parttime', label: t('partTime') },
+                  { value: 'contract', label: t('contract') },
                 ]}
               />
             </div>
 
             {/* Job Boards */}
             <div className="filter-group" style={{ marginTop: 14 }}>
-              <div className="filter-label">Job Boards</div>
+              <div className="filter-label">{t('jobBoards')}</div>
               <div className="site-pills">
                 {ALL_SITES.map(site => (
                   <button
-                    key={site}
-                    type="button"
+                    key={site} type="button"
                     className={`site-pill${activeSites.includes(site) ? ' active' : ''}`}
                     onClick={() => toggleSite(site)}
                   >
@@ -828,8 +733,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               <div className="site-pills">
                 {JUMPSHIP_SITES.map(site => (
                   <button
-                    key={site}
-                    type="button"
+                    key={site} type="button"
                     className={`site-pill${activeSites.includes(site) ? ' active' : ''}`}
                     onClick={() => toggleSite(site)}
                   >
@@ -838,14 +742,14 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                 ))}
               </div>
               {activeSites.length === 0 && (
-                <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>Select at least one board</div>
+                <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>{t('selectAtLeastOne')}</div>
               )}
             </div>
 
             {/* Results count */}
             <div className="filter-group" style={{ marginTop: 14 }}>
               <div className="filter-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Results per search</span>
+                <span>{t('resultsPerSearch')}</span>
                 <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 13 }}>{resultsWanted}</span>
               </div>
               <div className="range-slider-container">
@@ -859,11 +763,7 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                   }}
                 />
                 <div className="range-ticks">
-                  <span>5</span>
-                  <span>15</span>
-                  <span>25</span>
-                  <span>35</span>
-                  <span>50</span>
+                  <span>5</span><span>15</span><span>25</span><span>35</span><span>50</span>
                 </div>
               </div>
             </div>
@@ -875,13 +775,13 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
             disabled={jobSearch.isPending || keywords.length === 0 || activeSites.length === 0}
           >
             {jobSearch.isPending
-              ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Fetching jobs…</>
-              : <><SearchIcon size={14} style={{ verticalAlign: 'middle', marginRight: 5 }} />Search Jobs</>}
+              ? <><div className="spinner" style={{ width: 14, height: 14 }} /> {t('fetchingJobs')}</>
+              : <><SearchIcon size={14} style={{ verticalAlign: 'middle', marginRight: 5 }} />{t('searchJobs')}</>}
           </button>
 
           {keywords.length === 0 && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: -12 }}>
-              Add at least one keyword or upload a résumé
+              {t('addKeywordHint')}
             </div>
           )}
 
@@ -889,12 +789,12 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           {searchHistory.length > 0 && (
             <div className="search-history">
               <div className="search-history-title">
-                <span>Recent Searches</span>
+                <span>{t('recentSearches')}</span>
                 <button
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 10, cursor: 'pointer' }}
                   onClick={() => { localStorage.removeItem(HISTORY_KEY); setSearchHistory([]); }}
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </div>
               <div className="history-list">
@@ -911,13 +811,12 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
 
         {/* ── MAIN CONTENT ── */}
         <main className="main-content">
-
           {(<>
           {searchPipelineBusy ? (
             <>
               <div className="results-header">
                 <div className="results-title">
-                  {jobSearch.isPending ? 'Searching job boards…' : 'Evaluating your fit…'}
+                  {jobSearch.isPending ? t('searchingBoards') : t('evaluatingFit')}
                 </div>
               </div>
               <AssessmentLoader
@@ -929,30 +828,30 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
           ) : !jobSearch.data ? (
             <div className="empty-state">
               <div className="empty-icon"><Rocket size={36} strokeWidth={1.2} /></div>
-              <div className="empty-title">Ready to launch your search</div>
+              <div className="empty-title">{t('readyToLaunch')}</div>
               <div className="empty-sub">
-                {resumeProfile
-                  ? 'Keywords extracted. Hit Search to find matching jobs.'
-                  : 'Upload your résumé to let the AI find the best matches.'}
+                {resumeProfile ? t('keywordsExtracted') : t('uploadResumeHint')}
               </div>
             </div>
           ) : (
             <>
               <div className="results-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <div className="results-title">Results</div>
-                  <div className="results-count">{sortedJobs.length} jobs</div>
+                  <div className="results-title">{t('results')}</div>
+                  <div className="results-count">{sortedJobs.length} {t('jobsCount')}</div>
                   {filteredCount > 0 && (
                     <button
                       className={`filter-pill${showHidden ? ' active' : ''}`}
                       onClick={() => setShowHidden(v => !v)}
                     >
-                      {showHidden ? <><X size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />Hide</> : <Eye size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />} {filteredCount} unrelated
+                      {showHidden
+                        ? <><X size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} />{t('hide')}</>
+                        : <><Eye size={10} style={{ verticalAlign: 'middle', marginRight: 3 }} /></>}
+                      {' '}{filteredCount} {t('unrelated')}
                     </button>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {/* Export buttons */}
                   {sortedJobs.length > 0 && (
                     <div className="export-actions">
                       <button className="export-btn" onClick={() => exportCSV(sortedJobs, assessments)}>
@@ -969,9 +868,9 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                     value={sortBy}
                     onChange={v => setSortBy(v as SortOption)}
                     options={[
-                      { value: 'match', label: 'Sort: Best Match' },
-                      { value: 'newest', label: 'Sort: Newest' },
-                      { value: 'salary', label: 'Sort: Salary' },
+                      { value: 'match',  label: t('sortBestMatch') },
+                      { value: 'newest', label: t('sortNewest') },
+                      { value: 'salary', label: t('sortSalary') },
                     ]}
                   />
                 </div>
@@ -994,25 +893,20 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
                 ))}
               </div>
 
-              {/* Load More */}
               {hasMore && (
                 <div className="load-more-container">
-                  <button
-                    className="load-more-btn"
-                    onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
-                  >
-                    Show more ({sortedJobs.length - visibleCount} remaining)
+                  <button className="load-more-btn" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+                    {t('showMore')} ({sortedJobs.length - visibleCount} {t('remaining')})
                   </button>
                 </div>
               )}
 
-              {/* Hidden (unrelated) jobs section */}
               {showHidden && hiddenJobs.length > 0 && (
                 <div className="hidden-jobs-section">
                   <div className="hidden-jobs-header">
-                    <span>Unrelated Jobs</span>
+                    <span>{t('unrelatedJobs')}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>
-                      These were flagged by the AI as outside your professional field
+                      {t('unrelatedJobsDesc')}
                     </span>
                   </div>
                   <div className="jobs-list">
@@ -1037,8 +931,8 @@ export default function Search({ onBack, onNavigate }: SearchProps) {
               {!resumeProfile && jobs.length === 0 && (
                 <div className="empty-state">
                   <div className="empty-icon"><SearchIcon size={36} strokeWidth={1.2} /></div>
-                  <div className="empty-title">No jobs found</div>
-                  <div className="empty-sub">Try adjusting your keywords or location.</div>
+                  <div className="empty-title">{t('noJobsFound')}</div>
+                  <div className="empty-sub">{t('tryAdjusting')}</div>
                 </div>
               )}
             </>
